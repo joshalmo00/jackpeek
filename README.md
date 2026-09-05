@@ -2,6 +2,8 @@
 
 Windows app that starts a local-only web server and opens a browser UI for passive LLDP/CDP discovery.
 
+Friend/collaborator setup instructions are in [FRIEND_SETUP.md](FRIEND_SETUP.md).
+
 ## What it does
 
 - Runs as `NetworkPortAnalyzer.exe`.
