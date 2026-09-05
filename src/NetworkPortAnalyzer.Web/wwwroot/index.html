@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Network Port Analyzer</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <div class="brand-lockup">
+        <img class="brand-logo" src="assets/port-checker.png" alt="">
+        <div class="hero-copy">
+          <span class="eyebrow">Passive wired discovery</span>
+          <h1>Network Port Analyzer</h1>
+          <p>Investigate the switch port behind this Windows machine with LLDP/CDP only. No probing, no scans, no packets sent.</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="refreshBtn" title="Refresh Ethernet adapters">Refresh</button>
+      </div>
+    </section>
+
+    <section class="status-band">
+      <div class="adapter-card">
+        <span>Selected Ethernet</span>
+        <strong id="adapterName">Loading...</strong>
+        <small id="adapterDescription">Checking wired adapters</small>
+      </div>
+      <div class="metric">
+        <span>Link</span>
+        <strong id="adapterLink">Unknown</strong>
+      </div>
+      <div class="metric">
+        <span>MAC</span>
+        <strong id="adapterMac">Not advertised</strong>
+      </div>
+      <div class="metric">
+        <span>IP</span>
+        <strong id="adapterIps">Not assigned</strong>
+      </div>
+      <div class="metric">
+        <span>Capture</span>
+        <strong id="captureState">Checking</strong>
+      </div>
+    </section>
+
+    <section class="capture-panel">
+      <div class="panel-title">
+        <img src="assets/port-checker.png" alt="">
+        <div>
+          <h2>Port check</h2>
+          <p>Listen for switch advertisements on the selected wired adapter.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label>
+          Wired adapter
+          <select id="adapterSelect"></select>
+        </label>
+        <label>
+          Capture seconds
+          <input id="durationInput" type="number" min="5" max="120" value="30">
+        </label>
+        <button id="scanBtn" class="primary" title="Start passive capture">Start capture</button>
+      </div>
+      <div class="scan-meter">
+        <div id="progressBar"></div>
+      </div>
+      <div id="status" class="status">Loading Ethernet adapters...</div>
+    </section>
+
+    <section class="section-head">
+      <div>
+        <h2>Observed neighbors</h2>
+        <p>Switch identity, port advertisements, VLANs, and raw discovery TLVs.</p>
+      </div>
+    </section>
+    <section id="results" class="results"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

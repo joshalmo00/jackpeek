@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+.appdata/
+.dotnet/
+.dotnet-home/
+.localappdata/
+.nuget-packages/
+*.user
+*.suo
+*.tmp
+*.log

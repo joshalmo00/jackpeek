@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>NetworkPortAnalyzer</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0</InformationalVersion>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    <EmbeddedResource Include="wwwroot\**\*" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.ico" />
+    <ProjectReference Include="..\NetworkPortAnalyzer.Capture\NetworkPortAnalyzer.Capture.csproj" />
+    <ProjectReference Include="..\NetworkPortAnalyzer.Windows\NetworkPortAnalyzer.Windows.csproj" />
+  </ItemGroup>
+</Project>

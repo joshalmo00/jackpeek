@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="SharpPcap" Version="6.3.1" />
+    <ProjectReference Include="..\NetworkPortAnalyzer.Core\NetworkPortAnalyzer.Core.csproj" />
+    <ProjectReference Include="..\NetworkPortAnalyzer.Protocols\NetworkPortAnalyzer.Protocols.csproj" />
+  </ItemGroup>
+</Project>

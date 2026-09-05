@@ -1,0 +1,48 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Core", "src\NetworkPortAnalyzer.Core\NetworkPortAnalyzer.Core.csproj", "{0C3DCE02-99D9-4DB8-A5D5-4F724B321101}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Protocols", "src\NetworkPortAnalyzer.Protocols\NetworkPortAnalyzer.Protocols.csproj", "{19B878A9-3E89-4F4B-823A-07DC03E99ED0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Capture", "src\NetworkPortAnalyzer.Capture\NetworkPortAnalyzer.Capture.csproj", "{9514957D-26B8-491D-B762-6D7BB5ED58A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Windows", "src\NetworkPortAnalyzer.Windows\NetworkPortAnalyzer.Windows.csproj", "{AC89CB87-468E-4399-B8B6-60EFF07CA70A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Web", "src\NetworkPortAnalyzer.Web\NetworkPortAnalyzer.Web.csproj", "{70854CF3-0372-48FB-B99D-7EF401E720E4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkPortAnalyzer.Tests", "tests\NetworkPortAnalyzer.Tests\NetworkPortAnalyzer.Tests.csproj", "{4F20F26D-8DE9-4950-AB3C-98DA3647667F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0C3DCE02-99D9-4DB8-A5D5-4F724B321101}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C3DCE02-99D9-4DB8-A5D5-4F724B321101}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C3DCE02-99D9-4DB8-A5D5-4F724B321101}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C3DCE02-99D9-4DB8-A5D5-4F724B321101}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19B878A9-3E89-4F4B-823A-07DC03E99ED0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19B878A9-3E89-4F4B-823A-07DC03E99ED0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19B878A9-3E89-4F4B-823A-07DC03E99ED0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19B878A9-3E89-4F4B-823A-07DC03E99ED0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9514957D-26B8-491D-B762-6D7BB5ED58A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9514957D-26B8-491D-B762-6D7BB5ED58A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9514957D-26B8-491D-B762-6D7BB5ED58A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9514957D-26B8-491D-B762-6D7BB5ED58A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC89CB87-468E-4399-B8B6-60EFF07CA70A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC89CB87-468E-4399-B8B6-60EFF07CA70A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC89CB87-468E-4399-B8B6-60EFF07CA70A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC89CB87-468E-4399-B8B6-60EFF07CA70A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70854CF3-0372-48FB-B99D-7EF401E720E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70854CF3-0372-48FB-B99D-7EF401E720E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70854CF3-0372-48FB-B99D-7EF401E720E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70854CF3-0372-48FB-B99D-7EF401E720E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F20F26D-8DE9-4950-AB3C-98DA3647667F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F20F26D-8DE9-4950-AB3C-98DA3647667F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F20F26D-8DE9-4950-AB3C-98DA3647667F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F20F26D-8DE9-4950-AB3C-98DA3647667F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
