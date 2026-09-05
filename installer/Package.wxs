@@ -1,0 +1,40 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="JackPeek"
+    Manufacturer="JackPeek"
+    Version="1.0.0"
+    UpgradeCode="c13ee8f1-930a-4f83-a58b-9cfba16df3a8"
+    Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of JackPeek is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="JackPeek">
+        <Component Id="JackPeekApp" Guid="fb912893-3b11-40c2-a0af-b41a71d8dc45">
+          <File Id="JackPeekExe" Source="$(var.PublishDir)NetworkPortAnalyzer.exe" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="JackPeek">
+        <Component Id="ApplicationShortcut" Guid="a7c31881-2cda-4ebd-9455-8953afe1f0da">
+          <Shortcut
+            Id="ApplicationStartMenuShortcut"
+            Name="JackPeek"
+            Description="Secure passive wired discovery"
+            Target="[INSTALLFOLDER]NetworkPortAnalyzer.exe"
+            WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\JackPeek" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="ProductFeature" Title="JackPeek" Level="1">
+      <ComponentRef Id="JackPeekApp" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+  </Package>
+</Wix>

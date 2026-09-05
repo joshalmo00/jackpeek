@@ -49,3 +49,76 @@ public sealed record ScanResult(
     int FramesCaptured,
     IReadOnlyList<Observation> Observations,
     string? Error);
+
+public sealed record WorkstationIdentity(
+    string MachineName,
+    string? DomainName,
+    string? UserName,
+    string? UserSid,
+    string OperatingSystem,
+    string AppVersion,
+    DateTimeOffset CapturedAt);
+
+public sealed record EvidenceSettings(
+    bool SecureMode,
+    bool IncludeWindowsUser,
+    string LocalHistoryPath,
+    string? ArchiveMirrorPath,
+    int MaxCaptureDurationSeconds,
+    bool AllowSettingsEdit,
+    bool RequireValidLicense,
+    bool RequireEvidenceEncryption,
+    int EvidenceRetentionDays,
+    bool AllowEvidenceDeletion,
+    bool AllowNasMirror,
+    IReadOnlyList<string> AllowedExportFormats);
+
+public sealed record EvidenceSummary(
+    string EvidenceId,
+    DateTimeOffset CreatedAt,
+    string MachineName,
+    string? UserName,
+    string AdapterId,
+    string? DeviceName,
+    string? SwitchPort,
+    int FramesCaptured,
+    int Observations,
+    string LocalJsonPath,
+    string? MirrorJsonPath,
+    string Sha256);
+
+public sealed record EvidenceRecord(
+    string EvidenceId,
+    DateTimeOffset CreatedAt,
+    WorkstationIdentity Workstation,
+    EvidenceSettings Settings,
+    ScanResult Scan,
+    string Sha256);
+
+public sealed record LicenseDocument(
+    string LicenseId,
+    string Product,
+    string Edition,
+    string Organization,
+    DateTimeOffset ValidFrom,
+    DateTimeOffset ValidUntil,
+    string? MachineId,
+    IReadOnlyList<string> Features,
+    string Signature);
+
+public sealed record LicenseStatus(
+    bool IsValid,
+    string State,
+    string? LicenseId,
+    string? Edition,
+    string? Organization,
+    DateTimeOffset? ValidUntil,
+    IReadOnlyList<string> Features,
+    string? Detail);
+
+public sealed record AuditEvent(
+    DateTimeOffset CreatedAt,
+    string Action,
+    string Outcome,
+    string? EvidenceId,
+    string? Detail);

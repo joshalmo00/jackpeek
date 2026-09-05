@@ -1,0 +1,748 @@
+{
+  "meta": {
+    "url": "https://www.tanium.com",
+    "title": "Autonomous IT, endpoint intelligence and control | Tanium",
+    "description": "Tanium is a unified endpoint management and security platform: agentic AI for real-time visibility, patching, and risk remediation across endpoints.",
+    "language": "en",
+    "viewport": "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5",
+    "themeColor": "#e01a33",
+    "ogImage": "https://cdn.sanity.io/images/217hjbx8/production/4735c2ea085f9f5789b5443deabf703bb7d9d44c-1200x628.jpg",
+    "ogTitle": "Autonomous IT, endpoint intelligence and control | Tanium",
+    "ogDescription": "Tanium is a unified endpoint management and security platform: agentic AI for real-time visibility, patching, and risk remediation across endpoints."
+  },
+  "theme": {
+    "mode": "light",
+    "bodyBackground": "#ffffff",
+    "isDark": false,
+    "confidence": 0.9
+  },
+  "brand": {
+    "name": "Tanium",
+    "favicon": {
+      "href": "https://www.tanium.com/_assets/apple-touch-icon.png",
+      "type": null
+    }
+  },
+  "colors": {
+    "dominant": [
+      {
+        "hex": "#ffffff",
+        "ratio": 0.508
+      },
+      {
+        "hex": "#c6c5c5",
+        "ratio": 0.209
+      },
+      {
+        "hex": "#000000",
+        "ratio": 0.151
+      },
+      {
+        "hex": "#dddddd",
+        "ratio": 0.046
+      },
+      {
+        "hex": "#efeeeb",
+        "ratio": 0.024
+      },
+      {
+        "hex": "#e01a33",
+        "ratio": 0.011
+      },
+      {
+        "hex": "#555555",
+        "ratio": 0.011
+      },
+      {
+        "hex": "#751323",
+        "ratio": 0.011
+      },
+      {
+        "hex": "#ddc186",
+        "ratio": 0.007
+      },
+      {
+        "hex": "#a7a6a6",
+        "ratio": 0.007
+      },
+      {
+        "hex": "#c10000",
+        "ratio": 0.005
+      },
+      {
+        "hex": "#d8d8d8",
+        "ratio": 0.002
+      },
+      {
+        "hex": "#656565",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#101842",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#070a20",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#d92c20",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#696969",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#32ae88",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#262d53",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#707070",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#bbbbbb",
+        "ratio": 0.001
+      },
+      {
+        "hex": "#0a0f2b",
+        "ratio": 0
+      },
+      {
+        "hex": "#b54707",
+        "ratio": 0
+      },
+      {
+        "hex": "#3860be",
+        "ratio": 0
+      },
+      {
+        "hex": "#e9e9e9",
+        "ratio": 0
+      },
+      {
+        "hex": "#f9fffa",
+        "ratio": 0
+      },
+      {
+        "hex": "#f4f4f4",
+        "ratio": 0
+      }
+    ],
+    "palette": [
+      {
+        "hex": "#ffffff",
+        "role": "background",
+        "source": "computed"
+      },
+      {
+        "hex": "#ffffff",
+        "role": "foreground",
+        "source": "computed"
+      },
+      {
+        "hex": "#c10000",
+        "role": "primary",
+        "source": "heuristic"
+      },
+      {
+        "hex": "#b54707",
+        "role": "secondary",
+        "source": "heuristic"
+      },
+      {
+        "hex": "#e01a33",
+        "role": "accent",
+        "source": "heuristic"
+      },
+      {
+        "hex": "#c6c5c5",
+        "role": "neutral",
+        "source": "heuristic"
+      }
+    ],
+    "cssVariables": {
+      "--color-purple-200": "#deb4f8",
+      "--color-alpha-navy-40": "#101842",
+      "--color-navy-300": "#222f66",
+      "--color-sky-500": "#4a9fe8",
+      "--color-navy-800": "#0a0f2b",
+      "--token-border-table-of-contents": "#d4122a",
+      "--color-pink-500": "#ffd1b8",
+      "--color-neutral-600": "#7e7d7d",
+      "--token-icon-primary-link-hover": "#fff",
+      "--color-alpha-black-90": "#000000",
+      "--color-neutral-300": "#ddd",
+      "--token-icon-warning": "#fec84b",
+      "--token-bg-input": "#efeeeb",
+      "--color-purple-800": "#5f3479",
+      "--token-border-input": "#efeeeb",
+      "--token-icon-brand-fg": "#fff",
+      "--color-neutral-200": "#efeeeb",
+      "--token-bg-eyebrow-blue": "#282727",
+      "--token-text-hyperlink": "#ddc186",
+      "--token-text-hyperlink-hover": "#ff2742",
+      "--color-tanium-red-600": "#d4122a",
+      "--color-tanium-red-200": "#f49da8",
+      "--color-alpha-navy-20": "#101842",
+      "--token-bg-switcher-progress": "#8a1020",
+      "--token-bg-accordion-selected": "#efeeeb",
+      "--color-alpha-black-2": "#000000",
+      "--color-alpha-error": "#d92d20",
+      "--color-green-500": "#9bf04c",
+      "--token-bg-eyebrow-purple": "#35511a",
+      "--token-bg-checkbox-radio": "#efeeeb",
+      "--token-text-success": "#6ce9a6",
+      "--color-tanium-red-400": "#ff2742",
+      "--tw-gradient-from": "#000000",
+      "--token-bg-surface-dark": "#efeeeb",
+      "--color-sky-600": "#2e88d4",
+      "--color-white": "#fff",
+      "--token-bg-pagination-dot-default": "#ddd",
+      "--token-bg-button-primary": "#e01a33",
+      "--tw-gradient-to": "#000000",
+      "--color-pink-50": "#fff5f0",
+      "--token-text-inverse": "#000",
+      "--color-cream": "#fffcf5",
+      "--color-alpha-black-50": "#000000",
+      "--token-bg-disabled": "#7e7d7d",
+      "--color-navy-200": "#2a3874",
+      "--token-bg-switcher-default": "#8a1020",
+      "--color-alpha-white-70": "#ffffff",
+      "--token-bg-button-active": "#751323",
+      "--token-text-link-hover": "#ff2742",
+      "--color-gold-100": "#f2ead4",
+      "--token-border-tabbed-switcher-active": "#e01a33",
+      "--token-text-warning": "#fec84b",
+      "--token-border-card": "#efeeeb",
+      "--color-purple-600": "#9c54c9",
+      "--color-alpha-navy-60": "#101842",
+      "--token-text-link-active": "#ff2742",
+      "--token-text-faint": "#c6c5c5",
+      "--color-neutral-700": "#696868",
+      "--color-gold-900": "#cb6f0c",
+      "--token-bg-accordion-default": "#efeeeb",
+      "--token-text-error": "#fca19b",
+      "--color-sky-50": "#edf5fd",
+      "--token-border-primary": "#d4122a",
+      "--token-text-link-disabled": "#a7a6a6",
+      "--color-alpha-error-30": "#d92c20",
+      "--token-text-footer-link": "#ddd",
+      "--color-navy-100": "#324183",
+      "--color-green-900": "#35511a",
+      "--color-alpha-neutral-90": "#efeeeb",
+      "--token-text-heading": "#fff",
+      "--color-pink-100": "#ffeee6",
+      "--color-neutral-900": "#282727",
+      "--color-warning-50": "#fffaeb",
+      "--color-error-50": "#fef3f2",
+      "--color-alpha-warning": "#f79708",
+      "--color-gold-800": "#d2851a",
+      "--token-bg-warning": "#7a2e0e",
+      "--token-icon-success": "#a6f4c5",
+      "--color-error-600": "#d92c20",
+      "--color-tanium-red-900": "#751323",
+      "--token-bg-eyebrow-pink": "#3d224f",
+      "--color-tanium-red-50": "#f9c8ce",
+      "--color-neutral-100": "#f4f3f0",
+      "--color-gold-400": "#dfc272",
+      "--token-icon-checkbox-radio": "#fff",
+      "--color-alpha-black-70": "#000000",
+      "--token-bg-skeleton": "#efeeeb",
+      "--color-purple-1000": "#261632",
+      "--color-gold-200": "#e9d6a1",
+      "--token-icon-secondary-button": "#fff",
+      "--color-green-600": "#82c940",
+      "--token-bg-navlink-active": "#efeeeb",
+      "--color-success-300": "#6ce9a6",
+      "--color-warning-900": "#7a2e0e",
+      "--token-bg-muted": "#efeeeb",
+      "--color-gold-600": "#dda12a",
+      "--color-alpha-white-10": "#ffffff",
+      "--token-bg-stats-card": "#efeeeb",
+      "--color-sky-300": "#72b8ee",
+      "--token-icon-primary": "#fff",
+      "--token-bg-eyebrow": "#0e1c43",
+      "--color-sky-400": "#5aace0",
+      "--token-bg-blog-cta-card": "#0ef19a",
+      "--token-icon-subtle": "#c6c5c5",
+      "--token-border-card-hover": "#efeeeb",
+      "--color-pink-600": "#d4af9b",
+      "--color-pink-200": "#ffe8db",
+      "--tw-gradient-via": "#000000",
+      "--color-success-500": "#12b76a",
+      "--color-alpha-navy-50": "#101842",
+      "--color-error-900": "#7a2619",
+      "--color-alpha-black-5": "#000000",
+      "--color-alpha-neutral-5": "#efeeeb",
+      "--color-alpha-navy": "#0e1c43",
+      "--color-green-400": "#aef36d",
+      "--color-alpha-neutral-30": "#efeeeb",
+      "--token-border-checkbox-radio": "#a7a6a6",
+      "--token-bg-surface-inverse": "#fff",
+      "--token-text-on-dark": "#fff",
+      "--color-alpha-neutral-40": "#efeeeb",
+      "--token-text-disabled": "#a7a6a6",
+      "--token-text-footer-link-hover": "#fff",
+      "--token-icon-muted": "#a7a6a6",
+      "--color-purple-400": "#c781f3",
+      "--token-bg-eyebrow-purple-inner": "#cdf8a5",
+      "--token-bg-table-cell": "#ffffff",
+      "--color-success-700": "#12744b",
+      "--color-green-200": "#cdf8a5",
+      "--token-text-button": "#fff",
+      "--token-bg-switcher-active": "#4a4949",
+      "--token-text-eyebrow": "#ddc186",
+      "--token-bg-eyebrow-celtic": "#7b6a60",
+      "--color-alpha-neutral-70": "#efeeeb",
+      "--token-border-error": "#d92c20",
+      "--color-neutral-950": "#1a1919",
+      "--color-black": "#000",
+      "--token-bg-background": "#101842",
+      "--token-text-muted": "#a7a6a6",
+      "--color-neutral-400": "#c6c5c5",
+      "--token-icon-contained": "#000",
+      "--token-border-muted": "#efeeeb",
+      "--color-error-800": "#912018",
+      "--color-warning-500": "#f79009",
+      "--token-text-link": "#fff",
+      "--token-icon-brand-bg": "#fff",
+      "--token-text-placeholder": "#efeeeb",
+      "--color-alpha-neutral-20": "#efeeeb",
+      "--color-warning-400": "#fdb022",
+      "--token-bg-error": "#fecdca",
+      "--token-bg-pagination-dot-active": "#e01a33",
+      "--token-text-subtle": "#a7a6a6",
+      "--token-bg-navbar": "#fff",
+      "--color-purple-500": "#bb65f1",
+      "--token-text-label": "#fff",
+      "--color-pink-300": "#ffe1d1",
+      "--token-bg-card": "#efeeeb",
+      "--color-gold-500": "#e1b648",
+      "--token-border-secondary-button": "#fafaf9",
+      "--color-error-400": "#f97066",
+      "--color-tanium-red-100": "#f6b5be",
+      "--color-alpha-black-10": "#000000",
+      "--color-error-200": "#fecdca",
+      "--color-neutral-500": "#a7a6a6",
+      "--token-bg-search-button": "#a21326",
+      "--color-alpha-white-50": "#ffffff",
+      "--color-pink-400": "#ffdbc7",
+      "--color-tanium-red-300": "#f07c8b",
+      "--color-alpha-navy-10": "#101842",
+      "--color-alpha-mint": "#0ef19a",
+      "--color-alpha-neutral-80": "#efeeeb",
+      "--color-green-100": "#ddfac2",
+      "--token-bg-card-hover": "#efeeeb",
+      "--color-gold-300": "#ddc186",
+      "--token-icon-primary-link": "#efeeeb",
+      "--token-icon-button": "#fff",
+      "--token-bg-surface-elevated": "#efeeeb",
+      "--color-purple-900": "#3d224f",
+      "--token-icon-link-hover": "#ff2742",
+      "--color-navy-500": "#151e4c",
+      "--color-sky-800": "#144e82",
+      "--token-bg-success": "#1c391c",
+      "--color-pink-800": "#7b6a60",
+      "--token-bg-tab-active": "#e01a33",
+      "--token-bg-surface-sunken": "#efeeeb",
+      "--color-alpha-white-30": "#ffffff",
+      "--token-logo-text": "#fff",
+      "--color-purple-100": "#e8ccfa",
+      "--color-pink-900": "#56463e",
+      "--tw-ring-offset-color": "#fff",
+      "--token-icon-error": "#fca19b",
+      "--color-alpha-neutral-60": "#efeeeb",
+      "--token-text-blog-cta-button": "#751323",
+      "--token-bg-scroll": "#751323",
+      "--color-error-300": "#fca19b",
+      "--color-gold-50": "#f8f5ec",
+      "--token-border-secondary-button-hover": "#c6c5c5",
+      "--token-bg-button-primary-hover": "#751323",
+      "--color-tanium-red-500": "#e01a33",
+      "--color-success-800": "#204b39",
+      "--token-text-on-light": "#000",
+      "--color-alpha-white-90": "#ffffff",
+      "--token-bg-eyebrow-blue-inner": "#ddd",
+      "--token-text-button-hover": "#fff",
+      "--token-icon-button-hover": "#fff",
+      "--token-bg-input-error": "#d92c20",
+      "--color-gold-700": "#d99222",
+      "--color-alpha-black-30": "#000000",
+      "--token-bg-button-secondary-hover": "#efeeeb",
+      "--token-bg-tabbed-switcher": "#fff",
+      "--color-navy-400": "#1b2658",
+      "--color-alpha-navy-80": "#101842",
+      "--color-neutral-50": "#fafaf9",
+      "--color-sky-700": "#1e6bad",
+      "--token-border-checkbox-radio-checked": "#fff",
+      "--color-error-700": "#b42318",
+      "--token-text-highlight": "#e01a33",
+      "--color-success-50": "#ecfdf3",
+      "--color-success-200": "#a6f4c5",
+      "--token-text-blog-cta-card": "#fff",
+      "--token-icon-disabled": "#a7a6a6",
+      "--token-bg-eyebrow-pink-inner": "#d298f6",
+      "--color-alpha-white-5": "#ffffff",
+      "--color-navy-700": "#0d1337",
+      "--token-icon-link": "#fff",
+      "--color-navy-900": "#070a20",
+      "--color-success-400": "#32d583",
+      "--token-icon-contained-hover": "#000",
+      "--color-warning-800": "#93370c",
+      "--color-green-50": "#eafcd9",
+      "--color-error-100": "#fee4e2",
+      "--token-bg-button-secondary": "#751323",
+      "--color-alpha-navy-70": "#101842",
+      "--color-alpha-white-15": "#ffffff",
+      "--color-sky-100": "#d4e9f9",
+      "--color-success-100": "#d1fadf",
+      "--color-navy-50": "#3a4a92",
+      "--color-sky-900": "#0c3358",
+      "--color-pink-1000": "#322924",
+      "--token-border-eyebrow": "#ddd",
+      "--color-warning-200": "#fedf89",
+      "--token-text-secondary-button": "#fff",
+      "--color-alpha-white-2": "#ffffff",
+      "--color-green-800": "#4e7727",
+      "--color-warning-600": "#dc6803",
+      "--color-navy-600": "#101842",
+      "--color-tanium-red-700": "#a21326",
+      "--color-green-1000": "#1e2f0f",
+      "--token-bg-blog-cta-button": "#a21326",
+      "--token-bg-cta-bar": "#0ef19a",
+      "--token-text-nav-item": "#fff",
+      "--color-pink-700": "#aa8d7d",
+      "--token-bg-secondary-background": "#101842",
+      "--color-error-500": "#f04437",
+      "--token-border-secondary": "#efeeeb",
+      "--color-warning-300": "#fec84b",
+      "--color-alpha-neutral-10": "#efeeeb",
+      "--token-bg-tabbed-switcher-active": "#d4122a",
+      "--color-purple-50": "#f2e3fc",
+      "--color-alpha-neutral-50": "#efeeeb",
+      "--token-border-strong": "#fff",
+      "--color-warning-100": "#fef0c7",
+      "--color-alpha-navy-90": "#101842",
+      "--color-green-300": "#bdf688",
+      "--token-text-highlight-navy": "#94a4cc",
+      "--color-tanium-red-800": "#8a1020",
+      "--color-warning-700": "#b54707",
+      "--token-logo-icon": "#fff",
+      "--color-alpha-success": "#039665",
+      "--token-icon-breadcrumb": "#a7a6a6",
+      "--color-green-700": "#6a9343",
+      "--token-text-highlight-gold": "#ddc186",
+      "--color-purple-700": "#7c4d99",
+      "--color-success-900": "#1c391c",
+      "--color-neutral-800": "#4a4949",
+      "--color-success-600": "#039855",
+      "--token-text-nav-item-hover": "#c6c5c5",
+      "--token-text-filled": "#fff",
+      "--color-sky-200": "#a2cff3",
+      "--token-text-body": "#c6c5c5",
+      "--token-border-subtle": "#efeeeb",
+      "--color-alpha-navy-30": "#101842",
+      "--token-border-pagination": "#282727",
+      "--token-bg-eyebrow-celtic-inner": "#ffe1d1",
+      "--color-purple-300": "#d298f6"
+    },
+    "gradients": []
+  },
+  "logo": {
+    "status": "confirmed",
+    "reason": null,
+    "best": {
+      "selector": "img.object-contain",
+      "href": "https://www.tanium.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F217hjbx8%2Fproduction%2F299e70d16137fb04dc959d863835535afa8432df-300x52.png&w=256&q=95",
+      "type": "png&w=3840&q=95",
+      "width": 281,
+      "height": 48,
+      "svgContent": null,
+      "colors": [],
+      "isLight": false,
+      "isDark": false,
+      "needsDarkBackground": false,
+      "needsLightBackground": false,
+      "ownership": "first-party",
+      "variant": "color",
+      "brandNameOnLogo": "TANIUM",
+      "uploadedUrl": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/339d7942-4303-4365-9cad-93bb1774bfc5.png"
+    },
+    "candidates": [
+      {
+        "selector": "img.object-contain",
+        "href": "https://www.tanium.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F217hjbx8%2Fproduction%2F1086e89e41d1e9e3b65c756bed3506960eb23fcf-300x58.png&w=256&q=95",
+        "type": "png&w=3840&q=95",
+        "width": 281,
+        "height": 54,
+        "svgContent": null,
+        "colors": [],
+        "isLight": false,
+        "isDark": false,
+        "needsDarkBackground": false,
+        "needsLightBackground": false,
+        "ownership": "first-party"
+      },
+      {
+        "selector": "img.object-contain",
+        "href": "https://www.tanium.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F217hjbx8%2Fproduction%2F299e70d16137fb04dc959d863835535afa8432df-300x52.png&w=256&q=95",
+        "type": "png&w=3840&q=95",
+        "width": 281,
+        "height": 48,
+        "svgContent": null,
+        "colors": [],
+        "isLight": false,
+        "isDark": false,
+        "needsDarkBackground": false,
+        "needsLightBackground": false,
+        "ownership": "first-party"
+      },
+      {
+        "selector": "img",
+        "href": "https://cdn.cookielaw.org/logos/static/powered_by_logo.svg",
+        "type": "svg",
+        "width": 568,
+        "height": 53,
+        "svgContent": null,
+        "colors": [],
+        "isLight": false,
+        "isDark": false,
+        "needsDarkBackground": false,
+        "needsLightBackground": false,
+        "ownership": "third-party"
+      },
+      {
+        "selector": "img",
+        "href": "https://cdn.cookielaw.org/logos/31c633e1-37d0-47f6-97a0-a7c60a90dcb5/018fa0c0-184c-7664-a97a-7a27e3c4c633/17283919-8a1c-404b-88a1-905e2cc8c41b/Tanium-120x40-Red.png",
+        "type": "png",
+        "width": 120,
+        "height": 40,
+        "svgContent": null,
+        "colors": [],
+        "isLight": false,
+        "isDark": false,
+        "needsDarkBackground": false,
+        "needsLightBackground": false,
+        "ownership": "third-party"
+      },
+      {
+        "selector": "img.object-contain",
+        "href": "https://cdn.sanity.io/images/217hjbx8/production/dbae76a55118cec6efc3450b468b8ce5e5cde111-150x27.svg",
+        "type": "svg",
+        "width": 150,
+        "height": 27,
+        "svgContent": null,
+        "colors": [],
+        "isLight": false,
+        "isDark": false,
+        "needsDarkBackground": false,
+        "needsLightBackground": false,
+        "ownership": "third-party"
+      },
+      {
+        "selector": "svg",
+        "href": null,
+        "type": "svg",
+        "width": 16,
+        "height": 16,
+        "svgContent": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" class=\"text-heading group-hover:text-body absolute transition-transform duration-300 ease-in-out group-hover:translate-x-[16px] \" stroke=\"currentColor\" stroke-width=\"1\" aria-hidden=\"true\" style=\"vector-effect:non-scaling-stroke\"><use href=\"/_assets/icons/ui-icon-sprite.svg#arrow-right\" style=\"vector-effect:non-scaling-stroke\"></use></svg>",
+        "colors": [
+          "#000000",
+          "#FFFFFF"
+        ],
+        "isLight": false,
+        "isDark": false,
+        "headerScoped": true,
+        "ownership": "first-party"
+      },
+      {
+        "selector": "svg",
+        "href": null,
+        "type": "svg",
+        "width": 16,
+        "height": 16,
+        "svgContent": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" class=\"text-heading group-hover:text-body absolute transition-transform duration-300 ease-in-out group-hover:translate-x-0 -translate-x-[16px]\" stroke=\"currentColor\" stroke-width=\"1\" aria-hidden=\"true\" style=\"vector-effect:non-scaling-stroke\"><use href=\"/_assets/icons/ui-icon-sprite.svg#arrow-right\" style=\"vector-effect:non-scaling-stroke\"></use></svg>",
+        "colors": [
+          "#000000",
+          "#FFFFFF"
+        ],
+        "isLight": false,
+        "isDark": false,
+        "headerScoped": true,
+        "ownership": "first-party"
+      },
+      {
+        "selector": "svg",
+        "href": null,
+        "type": "svg",
+        "width": 14,
+        "height": 14,
+        "svgContent": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" class=\"transition-transform duration-200 \" stroke=\"currentColor\" stroke-width=\"1\" aria-hidden=\"true\" style=\"vector-effect:non-scaling-stroke\"><use href=\"/_assets/icons/ui-icon-sprite.svg#chevron-down\" style=\"vector-effect:non-scaling-stroke\"></use></svg>",
+        "colors": [
+          "#000000",
+          "#FFFFFF"
+        ],
+        "isLight": false,
+        "isDark": false,
+        "headerScoped": true,
+        "ownership": "first-party"
+      }
+    ]
+  },
+  "fonts": {
+    "computed": [
+      {
+        "family": "Inter, ui-sans-serif, system-ui, sans-serif, ui-sans-serif, system-ui, sans-serif",
+        "weights": [
+          "400",
+          "600",
+          "500",
+          "800",
+          "900"
+        ],
+        "source": "system"
+      }
+    ],
+    "baseSizePx": 16
+  },
+  "confidence": {
+    "colorExtraction": 0.9,
+    "logoDetection": 0.95,
+    "fontDetection": 0.8
+  },
+  "screenshot": {
+    "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/screenshot.png",
+    "width": 1920,
+    "height": 1080,
+    "sizeBytes": 703497,
+    "uploadedAt": "2026-09-05T04:47:44.157Z"
+  },
+  "assets": {
+    "339d7942-4303-4365-9cad-93bb1774bfc5": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/339d7942-4303-4365-9cad-93bb1774bfc5.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "2.10 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 2150,
+        "uploadedAt": "2026-09-05T04:47:44.349Z"
+      }
+    },
+    "dfb75794-710b-47a1-82df-0fb56d05ce4c": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/dfb75794-710b-47a1-82df-0fb56d05ce4c.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "276.43 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 283064,
+        "uploadedAt": "2026-09-05T04:47:44.709Z"
+      }
+    },
+    "31be8afb-bf8e-4b06-a91d-3b70ffb1fc40": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/31be8afb-bf8e-4b06-a91d-3b70ffb1fc40.jpg",
+      "name": "VaMNu6Rd261ZyeeKfs47nD.jpg",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "38.86 KB",
+        "mimeType": "image/jpeg",
+        "sizeBytes": 39793,
+        "uploadedAt": "2026-09-05T04:47:44.608Z"
+      }
+    },
+    "6b120cfd-13aa-464e-8cc4-db8bfdbf8b97": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/6b120cfd-13aa-464e-8cc4-db8bfdbf8b97.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "58.16 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 59552,
+        "uploadedAt": "2026-09-05T04:47:44.402Z"
+      }
+    },
+    "2121dfac-c016-4368-b9a0-722a1606d817": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/2121dfac-c016-4368-b9a0-722a1606d817.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "2.65 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 2710,
+        "uploadedAt": "2026-09-05T04:47:44.614Z"
+      }
+    },
+    "b47762a8-b4b1-465b-9122-d6774fb942f2": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/b47762a8-b4b1-465b-9122-d6774fb942f2.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "1.59 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 1630,
+        "uploadedAt": "2026-09-05T04:47:44.871Z"
+      }
+    },
+    "b004ecc0-4990-4d3f-b85d-035812f1710b": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/b004ecc0-4990-4d3f-b85d-035812f1710b.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "2.14 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 2195,
+        "uploadedAt": "2026-09-05T04:47:44.877Z"
+      }
+    },
+    "f4a66fba-603d-45d0-b667-be8938ab064a": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/f4a66fba-603d-45d0-b667-be8938ab064a.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "2.53 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 2593,
+        "uploadedAt": "2026-09-05T04:47:44.912Z"
+      }
+    },
+    "8ff5be30-b03c-401d-831b-78f2dbe91651": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/8ff5be30-b03c-401d-831b-78f2dbe91651.svg",
+      "name": "dbae76a55118cec6efc3450b468b8ce5e5cde111-150x27.svg",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "1.98 KB",
+        "mimeType": "image/svg+xml",
+        "sizeBytes": 2031,
+        "uploadedAt": "2026-09-05T04:47:44.875Z"
+      }
+    },
+    "f002f526-9ed0-4528-a427-28ac1a3e28f4": {
+      "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/brand/1cc84729-49a2-40b7-bea5-f9eebbd23276/assets/f002f526-9ed0-4528-a427-28ac1a3e28f4.png",
+      "name": "image",
+      "type": "image",
+      "description": "",
+      "metadata": {
+        "size": "1.67 KB",
+        "mimeType": "image/png",
+        "sizeBytes": 1706,
+        "uploadedAt": "2026-09-05T04:47:44.861Z"
+      }
+    }
+  }
+}

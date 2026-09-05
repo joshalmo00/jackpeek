@@ -1,0 +1,28 @@
+{
+  "projects": [
+    {
+      "projectId": "7b65f5b8-beda-44e5-80e5-61c11449f6e3",
+      "title": "JackPeek Enterprise UI Redesign",
+      "canvas": "https://superdesign.dev/teams/d411cfb6-1caa-4eeb-aadc-c27d9c57a740/projects/7b65f5b8-beda-44e5-80e5-61c11449f6e3",
+      "targets": [
+        {
+          "name": "JackPeek main app",
+          "baselineDraftId": "a118727c-c51b-4b3e-a64b-6e099c1a7616",
+          "activeDraftIds": [
+            "b76b73d9-5925-4fbf-873f-7171681b6506",
+            "c61ae11a-9676-4002-9b2e-7e419210e262"
+          ],
+          "contextFiles": [
+            ".superdesign/design-system.md",
+            "src/NetworkPortAnalyzer.Web/wwwroot/index.html",
+            "src/NetworkPortAnalyzer.Web/wwwroot/styles.css",
+            "src/NetworkPortAnalyzer.Web/wwwroot/app.js"
+          ],
+          "brandAssets": {
+            "logo": "assets-port-checker.png"
+          }
+        }
+      ]
+    }
+  ]
+}
