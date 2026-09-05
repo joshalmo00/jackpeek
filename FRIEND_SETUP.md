@@ -62,6 +62,18 @@ The ready-to-run executable is:
 output\v1.0\NetworkPortAnalyzer.exe
 ```
 
+To publish the Windows executable, WiX MSI, and SHA-256 release hashes:
+
+```powershell
+.\scripts\release-windows.ps1 -Version 1.0
+```
+
+Every release should include the executable, MSI, and matching `.sha256` files.
+
+To create an offline license, use `scripts\New-JackPeekLicense.ps1` from a secured administrative workstation. The private signing key must remain outside the repository and outside the installed application. Import the resulting `.lic` file in the Settings tab.
+
+Enterprise deployments can require a valid license, enable Windows DPAPI evidence protection, define retention, disable evidence deletion, and lock settings. These controls are local policy foundations for a later Group Policy provider.
+
 ## 6. Safety rules for changes
 
 - Keep capture passive-only.
@@ -70,6 +82,10 @@ output\v1.0\NetworkPortAnalyzer.exe
 - Do not bundle Npcap in the release.
 - Keep LLDP/CDP parsing separated from capture code so parser tests can run without Npcap.
 - Do not publish packet payloads unrelated to LLDP/CDP.
+- Keep evidence storage local-first. NAS/shared-folder archive support must be explicit and user-configured, never hidden.
+- Do not add required cloud telemetry, automatic uploads, or remote callbacks for secure deployments.
+- Keep the evidence package export local and auditable: JSON, HTML, and SHA-256 travel together in a downloadable ZIP.
+- Treat future SIEM/Syslog, ServiceNow/Jira, CMDB, and Intune/SCCM integrations as optional on-prem adapters; they must never become required runtime dependencies.
 
 ## 7. Share work back
 

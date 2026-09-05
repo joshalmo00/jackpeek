@@ -1,13 +1,18 @@
 using System.Net.NetworkInformation;
+using System.Text.Json;
 using NetworkPortAnalyzer.Protocols;
+using NetworkPortAnalyzer.Core;
 using NetworkPortAnalyzer.Windows;
+using NetworkPortAnalyzer.Web;
 
 var tests = new (string Name, Action Test)[]
 {
     ("parses LLDP switch identity and VLANs", Tests.ParseLldp),
     ("parses CDP switch identity and VLANs", Tests.ParseCdp),
     ("ignores unrelated Ethernet frames", Tests.IgnoreOtherTraffic),
-    ("filters to physical wired Ethernet adapters", Tests.FilterEthernetAdapters)
+    ("filters to physical wired Ethernet adapters", Tests.FilterEthernetAdapters),
+    ("rejects a license for another product", Tests.RejectsWrongLicenseProduct),
+    ("rejects an expired license", Tests.RejectsExpiredLicense)
 };
 
 var failed = 0;
@@ -83,6 +88,20 @@ internal static class Tests
         Assert(!WindowsAdapterService.IsSupportedEthernetAdapter(NetworkInterfaceType.Loopback, "Loopback", "Software Loopback Interface", OperationalStatus.Up), "loopback blocked");
         Assert(!WindowsAdapterService.IsSupportedEthernetAdapter(NetworkInterfaceType.Ethernet, "vEthernet (Default Switch)", "Hyper-V Virtual Ethernet Adapter", OperationalStatus.Up), "hyper-v blocked");
         Assert(!WindowsAdapterService.IsSupportedEthernetAdapter(NetworkInterfaceType.Ethernet, "VPN Adapter", "TAP-Windows Adapter V9", OperationalStatus.Up), "vpn blocked");
+    }
+
+    public static void RejectsWrongLicenseProduct()
+    {
+        var license = new LicenseDocument("test", "OtherProduct", "Trial", "Test", DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1), null, [], "");
+        var status = LicenseService.ValidateContent(JsonSerializer.Serialize(license));
+        Assert(!status.IsValid && status.State == "Invalid", "wrong product should be rejected");
+    }
+
+    public static void RejectsExpiredLicense()
+    {
+        var license = new LicenseDocument("test", "JackPeek", "Trial", "Test", DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(-1), null, [], "");
+        var status = LicenseService.ValidateContent(JsonSerializer.Serialize(license));
+        Assert(!status.IsValid && status.State == "Expired", "expired license should be rejected");
     }
 
     private static byte[] Frame(ushort etherType, params byte[][] payloads)

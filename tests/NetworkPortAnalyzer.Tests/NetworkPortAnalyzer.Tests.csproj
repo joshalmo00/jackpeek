@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\NetworkPortAnalyzer.Web\NetworkPortAnalyzer.Web.csproj" />
     <ProjectReference Include="..\..\src\NetworkPortAnalyzer.Protocols\NetworkPortAnalyzer.Protocols.csproj" />
     <ProjectReference Include="..\..\src\NetworkPortAnalyzer.Windows\NetworkPortAnalyzer.Windows.csproj" />
   </ItemGroup>

@@ -1,0 +1,8 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <OutputName>JackPeek</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <DefineConstants>PublishDir=$(MSBuildThisFileDirectory)..\output\v1.0\</DefineConstants>
+  </PropertyGroup>
+</Project>
