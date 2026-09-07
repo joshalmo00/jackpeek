@@ -22,6 +22,8 @@ const state = {
   adminToken: "",
   pendingCache: [],
   activeAdminTab: "staff",
+  logoClicks: 0,
+  logoClickTimer: null,
 };
 const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
 const emptySymbol =
@@ -109,6 +111,26 @@ function showNpcapDialog() {
 
 function hideNpcapDialog() {
   $("npcapDialog").hidden = true;
+}
+
+function showAdminLoginPage() {
+  showTab("settings");
+  if (!state.admin?.isConfigured) {
+    showAdminTab("access");
+    $("newAdminPasswordInput").focus();
+    $("adminPasswordStatus").textContent =
+      "Create the administrator password before using the hidden login shortcut.";
+    return;
+  }
+  $("adminLoginDialog").hidden = false;
+  $("adminPortalPasswordInput").value = "";
+  $("adminPortalStatus").textContent =
+    "Enter the administrator password to continue.";
+  $("adminPortalPasswordInput").focus();
+}
+
+function hideAdminLoginPage() {
+  $("adminLoginDialog").hidden = true;
 }
 
 function showTab(name, updateUrl = true) {
@@ -581,6 +603,14 @@ function showAdminTab(name) {
     panel.classList.toggle("active", active);
   });
 }
+function renderSettingsStatus() {
+  if (!state.settings) return;
+  $("settingsStatus").textContent = state.settings.allowSettingsEdit
+    ? settingsRequireAdminUnlock()
+      ? "Unlock administrator access to save protected settings."
+      : "Changes apply to future captures."
+    : "Settings editing is disabled by local policy.";
+}
 function applySettings(settings) {
   settings = { ...settingsDefaults, ...settings };
   state.settings = settings;
@@ -633,11 +663,7 @@ async function loadSession() {
       session.workstation?.userName || "User identity not recorded";
     applySettings(session.settings);
     applyLicense(session.license);
-    $("settingsStatus").textContent = session.settings.allowSettingsEdit
-      ? settingsRequireAdminUnlock()
-        ? "Unlock administrator access to save protected settings."
-        : "Changes apply to future captures."
-      : "Settings editing is disabled by local policy.";
+    renderSettingsStatus();
     renderAdminWorkspace();
     updateAdapter();
   } catch (error) {
@@ -710,27 +736,52 @@ async function saveSettings(event) {
     updateControls();
   }
 }
+async function validateAdminPassword(password) {
+    const result = await post("/api/admin/unlock", {
+      password,
+    });
+    state.adminToken = result.token || "";
+    state.admin = { isConfigured: true, isUnlocked: Boolean(result.unlocked) };
+    renderAdminWorkspace();
+    applySettings(state.settings);
+    renderSettingsStatus();
+    return result;
+}
 async function unlockAdmin(event) {
   event.preventDefault();
   if (!$("adminUnlockForm").reportValidity()) return;
   $("unlockAdminBtn").disabled = true;
   $("adminUnlockStatus").textContent = "Checking administrator password...";
   try {
-    const result = await post("/api/admin/unlock", {
-      password: $("adminPasswordInput").value,
-    });
-    state.adminToken = result.token || "";
-    state.admin = { isConfigured: true, isUnlocked: Boolean(result.unlocked) };
+    const result = await validateAdminPassword($("adminPasswordInput").value);
     $("adminPasswordInput").value = "";
     $("adminUnlockStatus").textContent =
       result.message || "Administrator workspace unlocked.";
-    renderAdminWorkspace();
-    applySettings(state.settings);
   } catch (error) {
     $("adminUnlockStatus").textContent =
       error.message || "Administrator password was not accepted.";
   } finally {
     $("unlockAdminBtn").disabled = false;
+  }
+}
+async function unlockAdminFromPortal(event) {
+  event.preventDefault();
+  if (!$("adminPortalForm").reportValidity()) return;
+  $("adminPortalSubmitBtn").disabled = true;
+  $("adminPortalStatus").textContent = "Validating administrator password...";
+  try {
+    const result = await validateAdminPassword($("adminPortalPasswordInput").value);
+    $("adminPortalPasswordInput").value = "";
+    hideAdminLoginPage();
+    showTab("settings");
+    showAdminTab("staff");
+    $("adminUnlockStatus").textContent =
+      result.message || "Administrator workspace unlocked.";
+  } catch (error) {
+    $("adminPortalStatus").textContent =
+      error.message || "Administrator password was not accepted.";
+  } finally {
+    $("adminPortalSubmitBtn").disabled = false;
   }
 }
 async function saveAdminPassword(event) {
@@ -752,6 +803,7 @@ async function saveAdminPassword(event) {
       "Administrator password saved. Unlock again to continue.";
     renderAdminWorkspace();
     applySettings(state.settings);
+    renderSettingsStatus();
   } catch (error) {
     $("adminPasswordStatus").textContent = error.message;
   } finally {
@@ -764,6 +816,7 @@ function lockAdmin() {
   $("adminUnlockStatus").textContent = "Administrator workspace locked.";
   renderAdminWorkspace();
   applySettings(state.settings);
+  renderSettingsStatus();
 }
 async function syncPendingCache() {
   $("syncCacheBtn").disabled = true;
@@ -778,6 +831,18 @@ async function syncPendingCache() {
   } finally {
     $("syncCacheBtn").disabled = false;
   }
+}
+function handleBrandLogoClick(event) {
+  state.logoClicks += 1;
+  clearTimeout(state.logoClickTimer);
+  state.logoClickTimer = setTimeout(() => {
+    state.logoClicks = 0;
+  }, 2500);
+  if (state.logoClicks < 7) return;
+  event.preventDefault();
+  state.logoClicks = 0;
+  clearTimeout(state.logoClickTimer);
+  showAdminLoginPage();
 }
 async function importLicense() {
   const file = $("licenseFileInput").files[0];
@@ -1009,6 +1074,7 @@ async function deleteReport(id) {
 }
 
 $("captureForm").addEventListener("submit", startScan);
+$("brandLogo").addEventListener("click", handleBrandLogoClick);
 $("refreshBtn").addEventListener("click", loadAdapters);
 $("adapterSelect").addEventListener("change", updateAdapter);
 $("resumeScanBtn").addEventListener("click", pollScan);
@@ -1018,6 +1084,8 @@ $("neighborList").addEventListener("click", (event) => {
 });
 $("settingsForm").addEventListener("submit", saveSettings);
 $("adminUnlockForm").addEventListener("submit", unlockAdmin);
+$("adminPortalForm").addEventListener("submit", unlockAdminFromPortal);
+$("adminPortalCancelBtn").addEventListener("click", hideAdminLoginPage);
 $("adminPasswordForm").addEventListener("submit", saveAdminPassword);
 $("lockAdminBtn").addEventListener("click", lockAdmin);
 $("syncCacheBtn").addEventListener("click", syncPendingCache);
@@ -1054,6 +1122,9 @@ $("npcapCheckBtn").addEventListener("click", () => {
 });
 $("npcapDialog").addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideNpcapDialog();
+});
+$("adminLoginDialog").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideAdminLoginPage();
 });
 showTab(location.hash.slice(1), false);
 void Promise.allSettled([
