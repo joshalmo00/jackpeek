@@ -796,6 +796,122 @@ td small {
 .settings-form {
   min-width: 0;
 }
+.admin-workspace {
+  margin-bottom: 24px;
+  overflow: hidden;
+  background: #fff;
+}
+.workspace-header {
+  padding: 22px 28px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: Aptos, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+.workspace-label {
+  color: #005b97;
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.workspace-header h2 {
+  color: #05345a;
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: -0.9px;
+  margin-top: 4px;
+}
+.workspace-header > p:not(.workspace-label) {
+  color: #496377;
+  margin-top: 5px;
+}
+.workspace-tabs {
+  display: flex;
+  gap: 22px;
+  margin-top: 24px;
+  overflow-x: auto;
+}
+.workspace-tab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #496377;
+  padding: 0 0 13px;
+  font-size: 14px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+.workspace-tab.active {
+  color: #005b97;
+  border-bottom-color: #005b97;
+}
+.tab-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+.tab-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.admin-chip {
+  border: 1px solid #c9d6e2;
+  border-radius: 5px;
+  color: #6b7c8b;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px 2px;
+}
+.workspace-body {
+  padding: 24px 28px 28px;
+}
+.admin-panel {
+  display: grid;
+  gap: 18px;
+}
+.summary-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.summary-grid.compact div {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+}
+.summary-grid.compact dt {
+  display: block;
+  color: #6b7c8b;
+}
+.summary-grid.compact dd {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  margin-top: 7px;
+}
+.inline-form,
+.stack-form {
+  display: grid;
+  gap: 14px;
+}
+.inline-form {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+.inline-status {
+  color: var(--muted);
+  font-size: 12px;
+}
 fieldset {
   border: 0;
   padding: 0;
@@ -1098,6 +1214,12 @@ fieldset {
   }
   .settings-layout {
     grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .summary-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inline-form {
+    grid-template-columns: 1fr;
   }
   .result-workspace {
     grid-template-columns: 235px minmax(0, 1fr);

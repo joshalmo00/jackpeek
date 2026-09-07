@@ -17,8 +17,13 @@ const state = {
   npcapPromptShown: false,
   timer: null,
   reportRequest: 0,
+  workstation: null,
+  admin: { isConfigured: false, isUnlocked: false },
+  adminToken: "",
+  pendingCache: [],
+  activeAdminTab: "staff",
 };
-const tabs = [...document.querySelectorAll('[role="tab"]')];
+const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
 const emptySymbol =
   '<div class="empty-symbol" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="12" width="34" height="24" rx="3"/><path d="M13 22h4v6h-4zm9 0h4v6h-4zm9 0h4v6h-4M14 17h20"/></svg></div>';
 const escapeHtml = (value) =>
@@ -69,10 +74,12 @@ async function request(path, options = {}) {
     throw new Error("The local service returned an unreadable response.");
   return body;
 }
-const post = (path, value) =>
+const adminHeaders = () =>
+  state.adminToken ? { "x-jackpeek-admin": state.adminToken } : {};
+const post = (path, value, headers = {}) =>
   request(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(value),
   });
 function badge(id, label, tone = "") {
@@ -502,26 +509,104 @@ const settingFields = {
   evidenceRetentionDays: "evidenceRetentionDaysInput",
   allowEvidenceDeletion: "allowEvidenceDeletionInput",
   allowNasMirror: "allowNasMirrorInput",
+  storageMode: "storageModeInput",
+  localCachePath: "localCachePathInput",
+  cacheExpirationHours: "cacheExpirationHoursInput",
+  nasSyncIntervalMinutes: "nasSyncIntervalMinutesInput",
+  adminManagedCacheEncryption: "adminManagedCacheEncryptionInput",
 };
+const settingsDefaults = {
+  storageMode: "local-nas-mirror",
+  localCachePath: "",
+  cacheExpirationHours: 24,
+  nasSyncIntervalMinutes: 60,
+  adminManagedCacheEncryption: true,
+};
+function settingsRequireAdminUnlock() {
+  return Boolean(state.admin?.isConfigured && !state.admin?.isUnlocked);
+}
+function renderAdminWorkspace() {
+  const admin = state.admin || { isConfigured: false, isUnlocked: false };
+  const unlocked = Boolean(admin.isUnlocked);
+  const setupMode = !admin.isConfigured;
+  $("adminWorkspace").hidden = !unlocked && !setupMode;
+  $("adminUnlockForm").hidden = unlocked || setupMode;
+  $("lockAdminBtn").hidden = !unlocked;
+  badge(
+    "adminAccessStatus",
+    unlocked
+      ? "Administrator unlocked"
+      : admin.isConfigured
+        ? "Password required"
+        : "Initial setup",
+    unlocked ? "success" : admin.isConfigured ? "warning" : "",
+  );
+  $("adminUnlockStatus").textContent = unlocked
+    ? "Administrator workspace is active for this browser session."
+    : admin.isConfigured
+      ? "Enter the administrator password to show protected workspace tabs."
+      : "Open Access Settings to create the administrator password for this workstation.";
+  $("currentAdminPasswordInput").required = Boolean(admin.isConfigured);
+  $("adminWindowsUser").textContent =
+    state.workstation?.userName || "User identity not recorded";
+  $("adminMachine").textContent =
+    state.workstation?.machineName || "Local workstation";
+  $("adminIdentityRecording").textContent = state.settings?.includeWindowsUser
+    ? "Enabled"
+    : "Disabled";
+  $("adminPendingCache").textContent = plural(
+    state.pendingCache?.length || 0,
+    "record",
+  );
+  $("adminStaffStatus").textContent = setupMode
+    ? "Initial setup"
+    : "Administrator unlocked";
+  $("adminStaffStatus").className = `badge ${setupMode ? "warning" : "success"}`;
+  $("adminStorageMode").textContent =
+    state.settings?.storageMode || "local-nas-mirror";
+  $("adminArchiveRepository").textContent =
+    state.settings?.archiveMirrorPath || "Not configured";
+}
+function showAdminTab(name) {
+  if (!["staff", "access", "general"].includes(name)) name = "staff";
+  state.activeAdminTab = name;
+  document.querySelectorAll("[data-admin-tab]").forEach((tab) => {
+    const active = tab.dataset.adminTab === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+    const active = panel.dataset.adminPanel === name;
+    panel.hidden = !active;
+    panel.classList.toggle("active", active);
+  });
+}
 function applySettings(settings) {
+  settings = { ...settingsDefaults, ...settings };
   state.settings = settings;
   for (const [key, id] of Object.entries(settingFields)) {
     const control = $(id);
     if (control.type === "checkbox") control.checked = Boolean(settings[key]);
+    else if (control.tagName === "SELECT")
+      control.value = settings[key] || "local-nas-mirror";
     else control.value = settings[key] ?? "";
   }
   $("durationInput").max = String(settings.maxCaptureDurationSeconds || 120);
   if (Number($("durationInput").value) > Number($("durationInput").max))
     $("durationInput").value = $("durationInput").max;
-  $("settingsFields").disabled = !settings.allowSettingsEdit;
-  $("saveSettingsBtn").disabled = !settings.allowSettingsEdit;
+  const adminLocked = settingsRequireAdminUnlock();
+  $("settingsFields").disabled = !settings.allowSettingsEdit || adminLocked;
+  $("saveSettingsBtn").disabled = !settings.allowSettingsEdit || adminLocked;
   badge(
     "settingsPolicy",
-    settings.allowSettingsEdit
+    adminLocked
+      ? "Admin unlock required"
+      : settings.allowSettingsEdit
       ? "Editable on this workstation"
       : "Settings locked",
-    settings.allowSettingsEdit ? "" : "warning",
+    adminLocked || !settings.allowSettingsEdit ? "warning" : "",
   );
+  renderAdminWorkspace();
   updateControls();
 }
 function applyLicense(license) {
@@ -539,6 +624,9 @@ function applyLicense(license) {
 async function loadSession() {
   try {
     const session = await request("/api/session");
+    state.workstation = session.workstation;
+    state.admin = session.admin || { isConfigured: false, isUnlocked: false };
+    state.pendingCache = session.pendingCache || [];
     $("sessionMachine").textContent =
       session.workstation?.machineName || "Local workstation";
     $("sessionUser").textContent =
@@ -546,8 +634,11 @@ async function loadSession() {
     applySettings(session.settings);
     applyLicense(session.license);
     $("settingsStatus").textContent = session.settings.allowSettingsEdit
-      ? "Changes apply to future captures."
+      ? settingsRequireAdminUnlock()
+        ? "Unlock administrator access to save protected settings."
+        : "Changes apply to future captures."
       : "Settings editing is disabled by local policy.";
+    renderAdminWorkspace();
     updateAdapter();
   } catch (error) {
     $("settingsStatus").textContent = error.message;
@@ -563,6 +654,7 @@ async function saveSettings(event) {
   event.preventDefault();
   if (
     !state.settings?.allowSettingsEdit ||
+    settingsRequireAdminUnlock() ||
     state.settingsBusy ||
     !$("settingsForm").reportValidity()
   )
@@ -591,14 +683,18 @@ async function saveSettings(event) {
   updateControls();
   $("settingsStatus").textContent = "Saving settings...";
   try {
-    applySettings(await post("/api/evidence/settings", update));
+    applySettings(await post("/api/evidence/settings", update, adminHeaders()));
     $("settingsStatus").textContent = state.settings.allowSettingsEdit
       ? "Settings saved."
       : "Settings saved and editing locked.";
     const session = await request("/api/session");
+    state.workstation = session.workstation;
+    state.admin = { ...(session.admin || state.admin), isUnlocked: state.admin.isUnlocked };
+    state.pendingCache = session.pendingCache || [];
     $("sessionUser").textContent =
       session.workstation?.userName || "User identity not recorded";
     applyLicense(session.license);
+    renderAdminWorkspace();
     updateAdapter();
     state.selectedReport = null;
     $("reportDetail").hidden = true;
@@ -607,9 +703,80 @@ async function saveSettings(event) {
     $("settingsStatus").textContent = error.message;
   } finally {
     state.settingsBusy = false;
-    $("settingsFields").disabled = !state.settings?.allowSettingsEdit;
-    $("saveSettingsBtn").disabled = !state.settings?.allowSettingsEdit;
+    $("settingsFields").disabled =
+      !state.settings?.allowSettingsEdit || settingsRequireAdminUnlock();
+    $("saveSettingsBtn").disabled =
+      !state.settings?.allowSettingsEdit || settingsRequireAdminUnlock();
     updateControls();
+  }
+}
+async function unlockAdmin(event) {
+  event.preventDefault();
+  if (!$("adminUnlockForm").reportValidity()) return;
+  $("unlockAdminBtn").disabled = true;
+  $("adminUnlockStatus").textContent = "Checking administrator password...";
+  try {
+    const result = await post("/api/admin/unlock", {
+      password: $("adminPasswordInput").value,
+    });
+    state.adminToken = result.token || "";
+    state.admin = { isConfigured: true, isUnlocked: Boolean(result.unlocked) };
+    $("adminPasswordInput").value = "";
+    $("adminUnlockStatus").textContent =
+      result.message || "Administrator workspace unlocked.";
+    renderAdminWorkspace();
+    applySettings(state.settings);
+  } catch (error) {
+    $("adminUnlockStatus").textContent =
+      error.message || "Administrator password was not accepted.";
+  } finally {
+    $("unlockAdminBtn").disabled = false;
+  }
+}
+async function saveAdminPassword(event) {
+  event.preventDefault();
+  if (!$("adminPasswordForm").reportValidity()) return;
+  $("saveAdminPasswordBtn").disabled = true;
+  $("adminPasswordStatus").textContent = "Saving administrator password...";
+  try {
+    await post("/api/admin/password", {
+      currentPassword: $("currentAdminPasswordInput").value,
+      newPassword: $("newAdminPasswordInput").value,
+    });
+    $("currentAdminPasswordInput").value = "";
+    $("newAdminPasswordInput").value = "";
+    state.admin = { isConfigured: true, isUnlocked: false };
+    state.adminToken = "";
+    $("adminPasswordInput").focus();
+    $("adminPasswordStatus").textContent =
+      "Administrator password saved. Unlock again to continue.";
+    renderAdminWorkspace();
+    applySettings(state.settings);
+  } catch (error) {
+    $("adminPasswordStatus").textContent = error.message;
+  } finally {
+    $("saveAdminPasswordBtn").disabled = false;
+  }
+}
+function lockAdmin() {
+  state.adminToken = "";
+  state.admin = { ...(state.admin || {}), isUnlocked: false };
+  $("adminUnlockStatus").textContent = "Administrator workspace locked.";
+  renderAdminWorkspace();
+  applySettings(state.settings);
+}
+async function syncPendingCache() {
+  $("syncCacheBtn").disabled = true;
+  $("syncCacheStatus").textContent = "Syncing pending NAS cache...";
+  try {
+    const result = await post("/api/evidence/sync", {}, adminHeaders());
+    state.pendingCache = await request("/api/evidence/cache");
+    $("syncCacheStatus").textContent = `${result.uploaded || 0} uploaded, ${result.failed || 0} failed, ${result.deletedExpired || 0} expired record removed.`;
+    renderAdminWorkspace();
+  } catch (error) {
+    $("syncCacheStatus").textContent = error.message;
+  } finally {
+    $("syncCacheBtn").disabled = false;
   }
 }
 async function importLicense() {
@@ -850,6 +1017,13 @@ $("neighborList").addEventListener("click", (event) => {
   if (button) selectNeighbor(Number(button.dataset.neighbor));
 });
 $("settingsForm").addEventListener("submit", saveSettings);
+$("adminUnlockForm").addEventListener("submit", unlockAdmin);
+$("adminPasswordForm").addEventListener("submit", saveAdminPassword);
+$("lockAdminBtn").addEventListener("click", lockAdmin);
+$("syncCacheBtn").addEventListener("click", syncPendingCache);
+document.querySelectorAll("[data-admin-tab]").forEach((tab) =>
+  tab.addEventListener("click", () => showAdminTab(tab.dataset.adminTab)),
+);
 $("licenseFileInput").addEventListener("change", importLicense);
 $("refreshReportsBtn").addEventListener("click", loadReports);
 $("reportSearch").addEventListener("input", renderReports);

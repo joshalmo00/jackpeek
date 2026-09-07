@@ -134,8 +134,15 @@ app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpReque
 
 app.MapGet("/api/evidence/cache", (EvidenceStore evidence) => Results.Ok(evidence.ListPendingCache()));
 
-app.MapPost("/api/evidence/sync", (EvidenceStore evidence, AuditLog audit) =>
+app.MapPost("/api/evidence/sync", (HttpRequest http, EvidenceStore evidence, AdminService admin, AuditLog audit) =>
 {
+    var adminStatus = admin.GetStatus();
+    if (adminStatus.IsConfigured && !admin.ValidateToken(http.Headers["x-jackpeek-admin"].FirstOrDefault()))
+    {
+        audit.Write("evidence.cache.sync", "blocked", detail: "admin unlock required");
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     var result = evidence.SyncPendingCache();
     audit.Write("evidence.cache.sync", result.Failed == 0 ? "success" : "partial", detail: $"pending={result.PendingBefore}; uploaded={result.Uploaded}; deletedExpired={result.DeletedExpired}; failed={result.Failed}; lastError={result.LastError}");
     return Results.Ok(result);

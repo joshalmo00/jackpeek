@@ -292,6 +292,178 @@
           </div>
           <span id="settingsPolicy" class="badge">Loading policy</span>
         </div>
+        <section
+          id="adminWorkspace"
+          class="panel admin-workspace"
+          aria-labelledby="adminWorkspaceTitle"
+          hidden
+        >
+          <div class="workspace-header">
+            <p class="workspace-label">JackPeek administration</p>
+            <h2 id="adminWorkspaceTitle">Workspace settings</h2>
+            <p>
+              Manage workstation access, audit identity, and evidence storage in
+              one place.
+            </p>
+            <div
+              class="workspace-tabs"
+              role="tablist"
+              aria-label="Administrator workspace settings"
+            >
+              <button
+                class="workspace-tab active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                data-admin-tab="staff"
+              >
+                <span class="tab-icon" aria-hidden="true"
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3.5 19v-1.2C3.5 15.7 5.2 14 7.3 14h1.4c2.1 0 3.8 1.7 3.8 3.8V19m.8 0v-.8c0-1.5 1.2-2.7 2.7-2.7h1c1.5 0 2.7 1.2 2.7 2.7v.8"
+                    />
+                  </svg></span
+                >
+                Staff Management
+              </button>
+              <button
+                class="workspace-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-admin-tab="access"
+              >
+                <span class="tab-icon" aria-hidden="true"
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M12 3.5 18.5 6v5.2c0 4-2.6 7.6-6.5 9.3-3.9-1.7-6.5-5.3-6.5-9.3V6L12 3.5Zm-2.2 8.8 1.4 1.4 3.3-3.5"
+                    />
+                  </svg></span
+                >
+                Access Settings <span class="admin-chip">Admin</span>
+              </button>
+              <button
+                class="workspace-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-admin-tab="general"
+              >
+                <span class="tab-icon" aria-hidden="true"
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Zm0-5v2m0 13v2m7.4-14-1.4 1.4M6 18l-1.4 1.4m16-7.4h-2M5.5 12h-2m15.9 7.4L18 18M6 6 4.6 4.6"
+                    />
+                  </svg></span
+                >
+                General Settings
+              </button>
+            </div>
+          </div>
+          <div class="workspace-body">
+            <section class="admin-panel active" data-admin-panel="staff">
+              <div class="section-heading">
+                <div>
+                  <h3>Staff Management</h3>
+                  <p>Current Windows identity used for capture audit records.</p>
+                </div>
+                <span id="adminStaffStatus" class="badge success"
+                  >Administrator unlocked</span
+                >
+              </div>
+              <dl class="summary-grid compact">
+                <div>
+                  <dt>Windows user</dt>
+                  <dd id="adminWindowsUser">Loading</dd>
+                </div>
+                <div>
+                  <dt>Workstation</dt>
+                  <dd id="adminMachine">Loading</dd>
+                </div>
+                <div>
+                  <dt>Identity recording</dt>
+                  <dd id="adminIdentityRecording">Loading</dd>
+                </div>
+                <div>
+                  <dt>Pending NAS cache</dt>
+                  <dd id="adminPendingCache">Loading</dd>
+                </div>
+              </dl>
+              <p class="context-note">
+                JackPeek uses the active Windows session for audit identity. It
+                does not maintain a separate staff directory in this build.
+              </p>
+            </section>
+            <section class="admin-panel" data-admin-panel="access" hidden>
+              <div class="section-heading">
+                <div>
+                  <h3>Access Settings</h3>
+                  <p>Administrator password and guarded local policies.</p>
+                </div>
+                <span class="badge">Admin only</span>
+              </div>
+              <form id="adminPasswordForm" class="inline-form">
+                <label for="currentAdminPasswordInput"
+                  >Current password<input
+                    id="currentAdminPasswordInput"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Required when a password exists"
+                /></label>
+                <label for="newAdminPasswordInput"
+                  >New administrator password<input
+                    id="newAdminPasswordInput"
+                    type="password"
+                    minlength="10"
+                    autocomplete="new-password"
+                    required
+                /></label>
+                <button
+                  id="saveAdminPasswordBtn"
+                  class="button primary"
+                  type="submit"
+                >
+                  Save password
+                </button>
+              </form>
+              <p id="adminPasswordStatus" class="inline-status" role="status">
+                Password changes are stored locally for this workstation.
+              </p>
+            </section>
+            <section class="admin-panel" data-admin-panel="general" hidden>
+              <div class="section-heading">
+                <div>
+                  <h3>General Settings</h3>
+                  <p>Evidence repositories, cache health, and application state.</p>
+                </div>
+                <button id="syncCacheBtn" class="button secondary" type="button">
+                  Sync pending cache
+                </button>
+              </div>
+              <dl class="summary-grid compact">
+                <div>
+                  <dt>Application</dt>
+                  <dd>JackPeek 1.0</dd>
+                </div>
+                <div>
+                  <dt>Developed by</dt>
+                  <dd>Joshua Alvarez</dd>
+                </div>
+                <div>
+                  <dt>Storage mode</dt>
+                  <dd id="adminStorageMode">Loading</dd>
+                </div>
+                <div>
+                  <dt>Archive repository</dt>
+                  <dd id="adminArchiveRepository">Loading</dd>
+                </div>
+              </dl>
+              <p id="syncCacheStatus" class="inline-status" role="status">
+                Pending NAS cache sync has not been run in this session.
+              </p>
+            </section>
+          </div>
+        </section>
         <div class="settings-layout">
           <form id="settingsForm" class="panel settings-form">
             <fieldset id="settingsFields" disabled>
@@ -331,6 +503,57 @@
                 ><small id="archiveHelp"
                   >Archive copies have separate access and retention rules. A
                   local save does not confirm that a mirror was saved.</small
+                >
+                <label for="storageModeInput"
+                  >Storage mode<select id="storageModeInput">
+                    <option value="local-nas-mirror">
+                      Local history with NAS mirror
+                    </option>
+                    <option value="nas-only-encrypted-cache">
+                      NAS primary with encrypted local cache
+                    </option>
+                    <option value="local-only">Local history only</option>
+                  </select></label
+                >
+                <label for="localCachePathInput"
+                  >Pending cache folder<input
+                    id="localCachePathInput"
+                    type="text"
+                    spellcheck="false"
+                    aria-describedby="cacheHelp" /></label
+                ><small id="cacheHelp"
+                  >Used when NAS storage is temporarily unavailable.</small
+                >
+                <label for="cacheExpirationHoursInput"
+                  >Cache expiration (hours)<input
+                    id="cacheExpirationHoursInput"
+                    type="number"
+                    min="1"
+                    max="168"
+                    step="1"
+                    value="24"
+                    required
+                /></label>
+                <label for="nasSyncIntervalMinutesInput"
+                  >NAS sync interval (minutes)<input
+                    id="nasSyncIntervalMinutesInput"
+                    type="number"
+                    min="5"
+                    max="1440"
+                    step="1"
+                    value="60"
+                    required
+                /></label>
+                <label class="check-row"
+                  ><input
+                    id="adminManagedCacheEncryptionInput"
+                    type="checkbox"
+                  /><span
+                    >Use administrator managed cache encryption<small
+                      >Protect pending evidence cache using Windows data
+                      protection.</small
+                    ></span
+                  ></label
                 >
                 <label class="check-row"
                   ><input
@@ -426,6 +649,34 @@
             </div>
           </form>
           <aside class="settings-aside">
+            <section id="adminAccessCard" class="panel aside-section">
+              <h2>Administrator access</h2>
+              <p id="adminAccessStatus" class="badge">Checking</p>
+              <form id="adminUnlockForm" class="stack-form">
+                <label for="adminPasswordInput"
+                  >Administrator password<input
+                    id="adminPasswordInput"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                /></label>
+                <button id="unlockAdminBtn" class="button primary" type="submit">
+                  Unlock workspace
+                </button>
+              </form>
+              <p id="adminUnlockStatus" class="inline-status" role="status">
+                Unlock to show administrator workspace tabs and save protected
+                settings.
+              </p>
+              <button
+                id="lockAdminBtn"
+                class="button secondary"
+                type="button"
+                hidden
+              >
+                Lock administrator session
+              </button>
+            </section>
             <section class="panel aside-section">
               <h2>Offline license</h2>
               <p id="licenseStatus" class="badge">Checking</p>
