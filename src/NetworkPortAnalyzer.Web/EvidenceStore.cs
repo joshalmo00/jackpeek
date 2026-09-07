@@ -100,7 +100,7 @@ public sealed class EvidenceStore
         return next;
     }
 
-    public EvidenceSummary SaveScan(ScanResult scan)
+    public EvidenceSaveResult SaveScan(ScanResult scan)
     {
         var settings = GetSettings();
         Directory.CreateDirectory(settings.LocalHistoryPath);
@@ -130,7 +130,7 @@ public sealed class EvidenceStore
             }
         }
 
-        return ToSummary(record, localPath, mirrorPath);
+        return new EvidenceSaveResult(ToSummary(record, localPath, mirrorPath), record);
     }
 
     public IReadOnlyList<EvidenceSummary> ListReports()
@@ -390,3 +390,5 @@ public sealed record EvidenceSettingsUpdate(
     bool? AllowEvidenceDeletion,
     bool? AllowNasMirror,
     IReadOnlyList<string>? AllowedExportFormats);
+
+public sealed record EvidenceSaveResult(EvidenceSummary Summary, EvidenceRecord Record);

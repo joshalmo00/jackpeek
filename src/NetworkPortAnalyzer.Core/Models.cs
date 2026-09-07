@@ -95,6 +95,40 @@ public sealed record EvidenceRecord(
     ScanResult Scan,
     string Sha256);
 
+public sealed record PortLedgerEntry(
+    string LedgerId,
+    DateTimeOffset ScannedAt,
+    string? SwitchName,
+    string? SwitchChassisId,
+    string? SwitchPort,
+    IReadOnlyList<string> Protocols,
+    int? NativeVlan,
+    int? VoiceVlan,
+    string? ManagementIp,
+    string? Duplex,
+    IReadOnlyList<string> Capabilities,
+    string Workstation,
+    string? UserName,
+    string? DomainName,
+    string? UserSid,
+    string AdapterId,
+    string EvidenceId,
+    string ScanId,
+    bool HasCompleteIdentity,
+    string? IdentityKey,
+    string? LocalJsonPath,
+    string? MirrorJsonPath);
+
+public sealed record PortChange(
+    string Field,
+    string? Previous,
+    string? Current);
+
+public sealed record PortLedgerSummary(
+    PortLedgerEntry Entry,
+    IReadOnlyList<PortChange> Changes,
+    bool ChangedSincePrevious);
+
 public sealed record LicenseDocument(
     string LicenseId,
     string Product,

@@ -1,202 +1,546 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JackPeek</title>
-  <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <main class="app">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Local Windows utility for passive wired Ethernet discovery and evidence reports."
+    />
+    <title>Capture | JackPeek</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="topbar">
-      <div class="brand-lockup">
-        <img class="brand-logo" src="assets/port-checker.png" alt="">
-        <div>
-          <span class="eyebrow">Secure passive wired discovery</span>
-          <h1>JackPeek</h1>
+      <div class="shell topbar-inner">
+        <a class="brand" href="/#capture" aria-label="JackPeek capture"
+          ><img
+            src="/assets/port-checker.png"
+            width="36"
+            height="36"
+            alt=""
+          /><span>JackPeek</span></a
+        ><span class="product-label">Ethernet discovery</span>
+        <div class="workstation">
+          <span id="sessionMachine">Local workstation</span
+          ><span class="version">v1.0</span>
         </div>
-      </div>
-      <div class="top-actions">
-        <button id="refreshBtn" title="Refresh Ethernet adapters">Refresh</button>
-        <button class="settings-button" data-tab-target="settingsTab" title="Open settings">Settings</button>
       </div>
     </header>
-
-    <nav class="tabs" aria-label="JackPeek sections">
-      <button class="tab active" data-tab-target="captureTab">Capture</button>
-      <button class="tab" data-tab-target="resultsTab">Results</button>
-      <button class="tab" data-tab-target="historyTab">History</button>
-      <button class="tab" data-tab-target="settingsTab">Settings</button>
-    </nav>
-
-    <section id="captureTab" class="tab-panel active">
-      <section class="session-grid">
-        <article class="session-card">
-          <span>Windows session</span>
-          <strong id="sessionUser">Loading...</strong>
-          <small id="sessionMachine">Checking workstation identity</small>
-        </article>
-        <article class="session-card">
-          <span>Selected Ethernet</span>
-          <strong id="adapterName">Loading...</strong>
-          <small id="adapterDescription">Checking wired adapters</small>
-        </article>
-        <article class="session-card compact">
-          <span>Capture</span>
-          <strong id="captureState">Checking</strong>
-          <small id="adapterLink">Unknown link</small>
-        </article>
-      </section>
-
-      <section class="capture-focus">
-        <div class="capture-copy">
-          <span class="eyebrow">Passive LLDP/CDP only</span>
-          <h2>Document this switch port</h2>
-          <p>No probing, no switch login, no SNMP, no ping, and no packets sent.</p>
+    <div class="navigation">
+      <div class="shell nav-inner">
+        <div class="tabs" role="tablist" aria-label="Workspaces">
+          <button
+            id="capture-tab"
+            type="button"
+            class="tab"
+            role="tab"
+            aria-selected="true"
+            aria-controls="capture"
+            data-tab="capture"
+          >
+            Capture
+          </button>
+          <button
+            id="history-tab"
+            type="button"
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="history"
+            tabindex="-1"
+            data-tab="history"
+          >
+            Evidence history
+          </button>
+          <button
+            id="ports-tab"
+            type="button"
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="ports"
+            tabindex="-1"
+            data-tab="ports"
+          >
+            Port log
+          </button>
+          <button
+            id="settings-tab"
+            type="button"
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="settings"
+            tabindex="-1"
+            data-tab="settings"
+          >
+            Settings
+          </button>
         </div>
-        <button id="scanBtn" class="capture-button" title="Start passive capture">Start Capture</button>
-        <div class="quick-controls">
-          <label>
-            Wired adapter
-            <select id="adapterSelect"></select>
-          </label>
-          <label>
-            Capture seconds
-            <input id="durationInput" type="number" min="5" max="120" value="30">
-          </label>
+        <span class="nav-note">Passive LLDP / CDP</span>
+      </div>
+    </div>
+    <main id="main" class="shell main" tabindex="-1">
+      <section id="capture" role="tabpanel" aria-labelledby="capture-tab">
+        <div class="page-heading">
+          <div>
+            <h1>Port discovery</h1>
+            <p>Identify the switch and port connected to this workstation.</p>
+          </div>
+          <button id="refreshBtn" class="button secondary" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"
+              /></svg
+            ><span>Refresh adapters</span>
+          </button>
         </div>
-        <div class="scan-meter">
-          <div id="progressBar"></div>
-        </div>
-        <div id="status" class="status">Loading Ethernet adapters...</div>
-      </section>
-    </section>
-
-    <section id="resultsTab" class="tab-panel">
-      <section class="status-band">
-        <div class="metric">
-          <span>MAC</span>
-          <strong id="adapterMac">Not advertised</strong>
-        </div>
-        <div class="metric">
-          <span>IP</span>
-          <strong id="adapterIps">Not assigned</strong>
-        </div>
-        <div class="metric">
-          <span>Last evidence</span>
-          <strong id="lastEvidence">Not captured</strong>
-        </div>
-      </section>
-      <section class="section-head">
-        <div>
-          <h2>Observed neighbors</h2>
-          <p>Switch identity, port advertisements, VLANs, and raw discovery TLVs.</p>
-        </div>
-      </section>
-      <section id="results" class="results"></section>
-    </section>
-
-    <section id="historyTab" class="tab-panel">
-      <section class="section-head">
-        <div>
-          <h2>Evidence history</h2>
-          <p>Recent passive captures saved on this workstation.</p>
-        </div>
-        <button id="refreshReportsBtn" title="Refresh evidence history">Refresh history</button>
-      </section>
-      <section id="reports" class="reports"></section>
-    </section>
-
-    <section id="settingsTab" class="tab-panel">
-      <section class="settings-layout">
-        <article class="settings-card">
-          <div class="panel-title">
-            <img src="assets/port-checker.png" alt="">
+        <section
+          class="panel adapter-panel"
+          aria-label="Adapter and capture controls"
+        >
+          <dl class="adapter-summary">
+            <div class="adapter-identity">
+              <dt>Wired adapter</dt>
+              <dd id="adapterName">Checking adapters</dd>
+              <dd id="adapterDescription" class="subvalue">
+                Reading Windows Ethernet interfaces.
+              </dd>
+            </div>
             <div>
-              <h2>Enterprise evidence</h2>
-              <p>Local-first records with optional internal NAS mirroring.</p>
+              <dt>Link state</dt>
+              <dd><span id="adapterLink" class="badge">Checking</span></dd>
+            </div>
+            <div>
+              <dt>MAC address</dt>
+              <dd id="adapterMac" class="mono">Not available</dd>
+            </div>
+            <div>
+              <dt>IP addresses</dt>
+              <dd id="adapterIps" class="mono">Not assigned</dd>
+            </div>
+          </dl>
+          <form id="captureForm" class="capture-controls">
+            <label class="adapter-control" for="adapterSelect"
+              >Ethernet adapter<select id="adapterSelect" required disabled>
+                <option value="">Loading adapters...</option>
+              </select></label
+            ><label class="duration-control" for="durationInput"
+              >Duration (seconds)<input
+                id="durationInput"
+                type="number"
+                min="5"
+                max="120"
+                step="1"
+                value="30"
+                required /></label
+            ><button id="scanBtn" class="button primary" type="submit" disabled>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 5 10 7-10 7z" /></svg
+              ><span>Start capture</span></button
+            ><button
+              id="resumeScanBtn"
+              class="button secondary"
+              type="button"
+              hidden
+            >
+              Check capture status
+            </button>
+          </form>
+          <div class="capture-status">
+            <p id="status" role="status">Loading Ethernet adapters...</p>
+            <span id="captureState" class="badge"
+              >Checking capture support</span
+            >
+          </div>
+          <div id="captureProgress" class="capture-progress" hidden>
+            <div class="progress-label">
+              <span id="progressText">Listening for advertisements</span
+              ><span id="countdown" class="mono">30s</span>
+            </div>
+            <progress
+              id="progressBar"
+              value="0"
+              max="100"
+              aria-label="Capture progress"
+            ></progress>
+          </div>
+        </section>
+        <div id="captureNotice" class="notice" hidden></div>
+        <div class="section-heading">
+          <h2>
+            Observed neighbors <span id="neighborCount" class="count">0</span>
+          </h2>
+          <span id="captureSummary" class="secondary-text"
+            >No capture in this session</span
+          >
+        </div>
+        <div id="resultContext" class="result-context" hidden></div>
+        <section class="panel result-workspace" aria-label="Discovery results">
+          <aside class="neighbor-sidebar">
+            <div class="sidebar-heading">Neighbors</div>
+            <div id="neighborList">
+              <p class="sidebar-empty">Discovered switches will appear here.</p>
+            </div>
+          </aside>
+          <div id="results" class="neighbor-detail">
+            <div class="empty-state">
+              <div class="empty-symbol" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                  <rect x="7" y="12" width="34" height="24" rx="3" />
+                  <path d="M13 22h4v6h-4zm9 0h4v6h-4zm9 0h4v6h-4M14 17h20" />
+                </svg>
+              </div>
+              <h3>Ready when you are</h3>
+              <p>
+                Connect wired Ethernet, select the adapter, and start a capture.
+                JackPeek listens for switch advertisements.
+              </p>
             </div>
           </div>
-          <div class="settings-grid">
-            <label class="toggle-row">
-              <input id="secureModeInput" type="checkbox" checked>
-              Secure mode
-            </label>
-            <label class="toggle-row">
-              <input id="includeUserInput" type="checkbox" checked>
-              Record Windows user
-            </label>
-            <label>
-              Local history
-              <input id="localHistoryInput" type="text" spellcheck="false">
-            </label>
-            <label>
-              NAS / shared archive
-              <input id="archiveMirrorInput" type="text" placeholder="Optional, for example \\NAS\JackPeekReports" spellcheck="false">
-            </label>
-            <label>
-              Maximum capture seconds
-              <input id="maxCaptureDurationInput" type="number" min="5" max="120" value="120">
-            </label>
-            <label class="toggle-row">
-              <input id="allowSettingsEditInput" type="checkbox" checked>
-              Allow settings editing
-            </label>
-            <label class="toggle-row">
-              <input id="requireValidLicenseInput" type="checkbox">
-              Require valid license
-            </label>
-            <label class="toggle-row">
-              <input id="requireEvidenceEncryptionInput" type="checkbox">
-              Require evidence encryption
-            </label>
-            <label>
-              Evidence retention days
-              <input id="evidenceRetentionDaysInput" type="number" min="0" value="0">
-            </label>
-            <label class="toggle-row">
-              <input id="allowEvidenceDeletionInput" type="checkbox">
-              Allow evidence deletion
-            </label>
-            <label class="toggle-row">
-              <input id="allowNasMirrorInput" type="checkbox" checked>
-              Allow NAS mirror
-            </label>
-            <button id="saveSettingsBtn" title="Save evidence settings">Save settings</button>
-          </div>
-          <div id="settingsStatus" class="status">Loading evidence settings...</div>
-        </article>
-
-        <article class="settings-card">
-          <h2>Release integrity</h2>
-          <p>Release builds should publish the Windows executable, WiX MSI, and SHA-256 files beside both artifacts.</p>
-          <div class="field">
-            <span>Installer</span>
-            <strong>WiX Toolset MSI</strong>
-          </div>
-          <div class="field">
-            <span>Update validation</span>
-            <strong>SHA-256 per release artifact</strong>
-          </div>
-        </article>
-
-        <article class="settings-card">
-          <h2>License status</h2>
-          <p id="licenseStatus">Checking offline license...</p>
-          <div class="field">
-            <span>License file</span>
-            <strong id="licenseDetail">Not installed</strong>
-          </div>
-          <label>
-            Import offline license
-            <input id="licenseFileInput" type="file" accept=".lic,.json">
-          </label>
-          <div id="licenseImportStatus" class="status">No external connection is required.</div>
-        </article>
+        </section>
+        <div id="lastEvidence" class="evidence-strip" hidden></div>
+        <p class="context-note">
+          <strong>About these results</strong> Only advertised information is
+          shown. Missing fields mean the switch did not advertise a value.
+        </p>
       </section>
-    </section>
-  </main>
-  <script src="app.js"></script>
-</body>
+      <section
+        id="history"
+        role="tabpanel"
+        aria-labelledby="history-tab"
+        hidden
+      >
+        <div class="page-heading">
+          <div>
+            <h1>Evidence history</h1>
+            <p>
+              Review and export the most recent 100 captures in your configured
+              history folder.
+            </p>
+          </div>
+          <button id="refreshReportsBtn" class="button secondary" type="button">
+            Refresh history
+          </button>
+        </div>
+        <div class="panel history-panel">
+          <div class="history-toolbar">
+            <label class="search-label" for="reportSearch"
+              >Find a report<input
+                id="reportSearch"
+                type="search"
+                placeholder="Device, port, workstation, or evidence ID"
+                autocomplete="off" /></label
+            ><span id="reportCount" class="secondary-text"
+              >Loading reports</span
+            >
+          </div>
+          <p id="historyStatus" class="inline-status" role="status"></p>
+          <div id="reports" class="table-scroll"></div>
+        </div>
+        <section
+          id="reportDetail"
+          class="panel report-detail"
+          aria-label="Selected evidence report"
+          hidden
+        ></section>
+      </section>
+      <section id="ports" role="tabpanel" aria-labelledby="ports-tab" hidden>
+        <div class="page-heading">
+          <div>
+            <h1>Port log</h1>
+            <p>
+              Track repeated captures by switch port and review changes over
+              time.
+            </p>
+          </div>
+          <button id="refreshPortsBtn" class="button secondary" type="button">
+            Refresh port log
+          </button>
+        </div>
+        <div class="panel history-panel">
+          <div class="history-toolbar">
+            <label class="search-label" for="portSearch"
+              >Find a port<input
+                id="portSearch"
+                type="search"
+                placeholder="Switch, port, VLAN, IP, user, workstation, or evidence ID"
+                autocomplete="off" /></label
+            ><span id="portCount" class="secondary-text">Loading port log</span>
+          </div>
+          <p id="portStatus" class="inline-status" role="status"></p>
+          <div id="portLog" class="table-scroll"></div>
+        </div>
+      </section>
+      <section
+        id="settings"
+        role="tabpanel"
+        aria-labelledby="settings-tab"
+        hidden
+      >
+        <div class="page-heading">
+          <div>
+            <h1>Settings</h1>
+            <p>
+              Configure evidence storage, workstation identity, and capture
+              policy.
+            </p>
+          </div>
+          <span id="settingsPolicy" class="badge">Loading policy</span>
+        </div>
+        <div class="settings-layout">
+          <form id="settingsForm" class="panel settings-form">
+            <fieldset id="settingsFields" disabled>
+              <div class="settings-section">
+                <h2>Evidence storage</h2>
+                <p>
+                  Each completed capture is saved to the configured history
+                  folder.
+                </p>
+                <label for="localHistoryInput"
+                  >History folder<input
+                    id="localHistoryInput"
+                    type="text"
+                    spellcheck="false"
+                    required
+                    aria-describedby="historyHelp" /></label
+                ><small id="historyHelp"
+                  >Use a full Windows path. A network path sends records to that
+                  location.</small
+                >
+                <label class="check-row"
+                  ><input id="allowNasMirrorInput" type="checkbox" /><span
+                    >Allow archive mirroring<small
+                      >Copy new evidence to a second location when an archive
+                      path is set.</small
+                    ></span
+                  ></label
+                >
+                <label for="archiveMirrorInput"
+                  >Archive folder <span class="optional">Optional</span
+                  ><input
+                    id="archiveMirrorInput"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="\\server\share\JackPeek"
+                    aria-describedby="archiveHelp" /></label
+                ><small id="archiveHelp"
+                  >Archive copies have separate access and retention rules. A
+                  local save does not confirm that a mirror was saved.</small
+                >
+                <label class="check-row"
+                  ><input
+                    id="requireEvidenceEncryptionInput"
+                    type="checkbox"
+                  /><span
+                    >Encrypt new evidence files<small
+                      >Windows user encryption (DPAPI). Exports are readable
+                      files. Other Windows accounts may be unable to read
+                      encrypted archive copies.</small
+                    ></span
+                  ></label
+                >
+              </div>
+              <div class="settings-section">
+                <h2>Identity and retention</h2>
+                <label class="check-row"
+                  ><input id="includeUserInput" type="checkbox" /><span
+                    >Record Windows user identity<small
+                      >Include username, domain, and user SID in new evidence.
+                      Workstation name is always recorded.</small
+                    ></span
+                  ></label
+                >
+                <label class="check-row"
+                  ><input
+                    id="allowEvidenceDeletionInput"
+                    type="checkbox"
+                  /><span
+                    >Allow evidence deletion<small
+                      >Enable manual deletion and age-based cleanup in the
+                      history folder. Archive copies and exports are not
+                      removed.</small
+                    ></span
+                  ></label
+                >
+                <label for="evidenceRetentionDaysInput"
+                  >Retention (days)<input
+                    id="evidenceRetentionDaysInput"
+                    type="number"
+                    min="0"
+                    max="36500"
+                    step="1"
+                    value="0"
+                    required
+                    aria-describedby="retentionHelp" /></label
+                ><small id="retentionHelp"
+                  >0 keeps records indefinitely. Cleanup runs when saving a
+                  capture, only if deletion is allowed, using file modification
+                  age.</small
+                >
+              </div>
+              <div class="settings-section">
+                <h2>Capture policy</h2>
+                <label for="maxCaptureDurationInput"
+                  >Maximum capture duration (seconds)<input
+                    id="maxCaptureDurationInput"
+                    type="number"
+                    min="5"
+                    max="120"
+                    step="1"
+                    value="120"
+                    required
+                /></label>
+                <label class="check-row"
+                  ><input id="requireValidLicenseInput" type="checkbox" /><span
+                    >Require a valid offline license<small
+                      >Block captures when no valid license is installed.</small
+                    ></span
+                  ></label
+                >
+                <label class="check-row"
+                  ><input id="allowSettingsEditInput" type="checkbox" /><span
+                    >Allow settings editing<small
+                      >Turning this off locks this form after saving.
+                      Re-enabling it requires editing the local settings
+                      file.</small
+                    ></span
+                  ></label
+                >
+              </div>
+            </fieldset>
+            <div class="form-footer">
+              <p id="settingsStatus" role="status">Loading settings...</p>
+              <button
+                id="saveSettingsBtn"
+                class="button primary"
+                type="submit"
+                disabled
+              >
+                Save settings
+              </button>
+            </div>
+          </form>
+          <aside class="settings-aside">
+            <section class="panel aside-section">
+              <h2>Offline license</h2>
+              <p id="licenseStatus" class="badge">Checking</p>
+              <p id="licenseDetail">Reading license status.</p>
+              <label for="licenseFileInput"
+                >Import license file<input
+                  id="licenseFileInput"
+                  type="file"
+                  accept=".lic,.json"
+              /></label>
+              <p id="licenseImportStatus" role="status">
+                License validation runs on this workstation.
+              </p>
+            </section>
+            <section class="panel aside-section">
+              <h2>This workstation</h2>
+              <dl class="stacked-fields">
+                <div>
+                  <dt>Windows user</dt>
+                  <dd id="sessionUser">Loading</dd>
+                </div>
+                <div>
+                  <dt>Application</dt>
+                  <dd>JackPeek 1.0</dd>
+                </div>
+                <div>
+                  <dt>Capture method</dt>
+                  <dd>Passive LLDP / CDP</dd>
+                </div>
+              </dl>
+              <p>
+                The capture engine listens for advertisements. It does not test
+                connectivity, measure PoE, or change switch settings.
+              </p>
+            </section>
+            <section class="panel aside-section">
+              <h2>Data and usage</h2>
+              <p>
+                Read what JackPeek records, where evidence is stored, and the
+                conditions of use.
+              </p>
+              <a href="/privacy">Privacy Policy</a
+              ><a href="/terms">Terms &amp; Conditions</a>
+            </section>
+          </aside>
+        </div>
+      </section>
+      <noscript
+        ><div class="notice error">
+          JavaScript is required for capture controls and evidence history. The
+          privacy and terms pages remain available.
+        </div></noscript
+      >
+    </main>
+    <footer class="shell footer">
+      <span
+        >JackPeek 1.0 <span class="footer-divider">/</span> Local Ethernet
+        utility</span
+      >
+      <nav aria-label="Legal and project">
+        <a href="/privacy">Privacy Policy</a
+        ><a href="/terms">Terms &amp; Conditions</a
+        ><a
+          href="https://github.com/joshalmo00/jackpeek"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Project source<span class="sr-only"> (opens in a new tab)</span></a
+        >
+      </nav>
+    </footer>
+    <div
+      id="npcapDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="npcapDialogTitle"
+      aria-describedby="npcapDialogDescription"
+      hidden
+    >
+      <section class="modal-panel">
+        <div class="modal-heading">
+          <img src="/assets/port-checker.png" width="38" height="38" alt="" />
+          <div>
+            <h2 id="npcapDialogTitle">Capture driver required</h2>
+            <p id="npcapDialogDescription">
+              JackPeek can see the wired adapter, but Windows has not exposed an
+              Npcap capture device for it.
+            </p>
+          </div>
+        </div>
+        <ol class="setup-steps">
+          <li>Download Npcap from the official Nmap project website.</li>
+          <li>Run the installer using your organization approved settings.</li>
+          <li>Restart JackPeek or choose Check again after installation.</li>
+        </ol>
+        <p class="modal-note">
+          JackPeek does not bundle, redistribute, or silently install Npcap.
+        </p>
+        <div class="modal-actions">
+          <a
+            id="npcapDownloadLink"
+            class="button primary"
+            href="https://npcap.com/#download"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Open Npcap download</a
+          >
+          <button id="npcapCheckBtn" class="button secondary" type="button">
+            Check again
+          </button>
+          <button id="npcapDismissBtn" class="button secondary" type="button">
+            Not now
+          </button>
+        </div>
+      </section>
+    </div>
+  </body>
 </html>

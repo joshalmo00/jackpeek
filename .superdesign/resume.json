@@ -24,5 +24,42 @@
         }
       ]
     }
-  ]
+  ],
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "61e65bfc-6dbf-48e3-9ce2-4663a608c2e9",
+      "activeDraftId": "7024ee29-6c87-4377-b8a1-172cfcfc729b",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "src-NetworkPortAnalyzer.Web-wwwroot-assets-port-checker.png"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "src-NetworkPortAnalyzer.Web-wwwroot-assets-port-checker.png",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/61e65bfc-6dbf-48e3-9ce2-4663a608c2e9/brand-assets/src-NetworkPortAnalyzer.Web-wwwroot-assets-port-checker.png/port-checker.png",
+          "sourcePath": "src/NetworkPortAnalyzer.Web/wwwroot/assets/port-checker.png"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/NetworkPortAnalyzer.Web/wwwroot/index.html",
+        "src/NetworkPortAnalyzer.Web/wwwroot/styles.css:1:30"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "d5c52d1c97825c673282cc7605f13ebcff4834ebab19dc83f8d96f79cfbc4ac7",
+        "src/NetworkPortAnalyzer.Web/wwwroot/index.html": "2e9f20cb62538c780934819c8ec92bb32d529c21ee2fdfa0640ef5c75cee5251",
+        "src/NetworkPortAnalyzer.Web/wwwroot/styles.css": "c260987c59bef252f455ddc8732e6e965a511fd1e6e35aa1f8f20b66944a4892"
+      },
+      "drafts": {
+        "7024ee29-6c87-4377-b8a1-172cfcfc729b": {
+          "title": "JackPeek Capture Workspace",
+          "visualDirection": "Restrained graphite header, white functional workspace, green actions, sans-serif interface, split neighbor details",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-06T01:57:16.642Z"
+    }
+  }
 }
