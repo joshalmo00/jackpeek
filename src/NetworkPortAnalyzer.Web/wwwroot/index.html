@@ -13,6 +13,40 @@
     <script src="/app.js" defer></script>
   </head>
   <body>
+    <section id="accessDeniedScreen" class="auth-screen access-denied-screen" hidden>
+      <div class="auth-card access-card">
+        <div class="auth-brand">
+          <strong>SysSummit</strong>
+          <span>JackPeek</span>
+        </div>
+        <p class="workspace-label">Ethernet discovery</p>
+        <div class="denied-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" />
+            <path d="M17 20h.01M31 20h.01M16 32c3.8-4 12.2-4 16 0" />
+          </svg>
+        </div>
+        <p class="access-kicker">Access denied</p>
+        <h1>This Windows account is not approved</h1>
+        <p id="accessDeniedReason">
+          The approved-account repository did not recognize this Windows
+          session.
+        </p>
+        <div class="need-access">
+          <strong>Need access?</strong>
+          <p>
+            Email
+            <a href="mailto:joshua.alvarez@rwjbh.org">joshua.alvarez@rwjbh.org</a>
+            or
+            <a href="mailto:darien.valerin@rwjbh.org">darien.valerin@rwjbh.org</a>
+            to request access.
+          </p>
+        </div>
+        <p id="accessDeniedAccount" class="auth-footnote">
+          Checking Windows account.
+        </p>
+      </div>
+    </section>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="topbar">
       <div class="shell topbar-inner">
@@ -329,7 +363,7 @@
                     />
                   </svg></span
                 >
-                Staff Management
+                Account Manager
               </button>
               <button
                 class="workspace-tab"
@@ -369,8 +403,8 @@
             <section class="admin-panel active" data-admin-panel="staff">
               <div class="section-heading">
                 <div>
-                  <h3>Staff Management</h3>
-                  <p>Current Windows identity used for capture audit records.</p>
+                  <h3>Account Manager</h3>
+                  <p>Approved Windows accounts allowed to use JackPeek.</p>
                 </div>
                 <span id="adminStaffStatus" class="badge success"
                   >Administrator unlocked</span
@@ -380,6 +414,10 @@
                 <div>
                   <dt>Windows user</dt>
                   <dd id="adminWindowsUser">Loading</dd>
+                </div>
+                <div>
+                  <dt>Approved account</dt>
+                  <dd id="adminApprovedAccount">Loading</dd>
                 </div>
                 <div>
                   <dt>Workstation</dt>
@@ -395,9 +433,14 @@
                 </div>
               </dl>
               <p class="context-note">
-                JackPeek uses the active Windows session for audit identity. It
-                does not maintain a separate staff directory in this build.
+                JackPeek uses a small local approved-account list for this
+                build. Additions should be handled through a controlled release
+                so field workstations stay consistent.
               </p>
+              <div class="approved-users">
+                <h4>Pre-approved users</h4>
+                <ul id="approvedUsersList"></ul>
+              </div>
             </section>
             <section class="admin-panel" data-admin-panel="access" hidden>
               <div class="section-heading">
@@ -451,8 +494,8 @@
                   <dd>JackPeek 1.0</dd>
                 </div>
                 <div>
-                  <dt>Developed by</dt>
-                  <dd>Joshua Alvarez</dd>
+                  <dt>Designed by</dt>
+                  <dd>SysSummit</dd>
                 </div>
                 <div>
                   <dt>Storage mode</dt>
@@ -800,24 +843,27 @@
     </div>
     <div
       id="adminLoginDialog"
-      class="modal-backdrop"
+      class="auth-screen admin-login-screen"
       role="dialog"
       aria-modal="true"
       aria-labelledby="adminLoginTitle"
       aria-describedby="adminLoginDescription"
       hidden
     >
-      <section class="modal-panel admin-login-panel">
-        <div class="modal-heading">
-          <img src="/assets/port-checker.png" width="38" height="38" alt="" />
+      <section class="auth-card admin-login-panel">
+        <div class="auth-brand">
+          <img src="/assets/port-checker.png" width="44" height="44" alt="" />
           <div>
-            <h2 id="adminLoginTitle">Administrator Login</h2>
-            <p id="adminLoginDescription">
-              Enter the workstation administrator password to open Workspace
-              settings.
-            </p>
+            <strong>JackPeek</strong>
+            <span>SysSummit administration</span>
           </div>
         </div>
+        <p class="workspace-label">Administrator access</p>
+        <h1 id="adminLoginTitle">Administrator Login</h1>
+        <p id="adminLoginDescription">
+          Enter the workstation administrator password to open Workspace
+          settings.
+        </p>
         <form id="adminPortalForm" class="stack-form">
           <label for="adminPortalPasswordInput"
             >Administrator password<input

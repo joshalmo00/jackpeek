@@ -24,6 +24,7 @@ const state = {
   activeAdminTab: "staff",
   logoClicks: 0,
   logoClickTimer: null,
+  access: { isApproved: true, approvedUsers: [], accessContacts: [] },
 };
 const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
 const emptySymbol =
@@ -123,6 +124,7 @@ function showAdminLoginPage() {
     return;
   }
   $("adminLoginDialog").hidden = false;
+  document.body.classList.add("admin-login-open");
   $("adminPortalPasswordInput").value = "";
   $("adminPortalStatus").textContent =
     "Enter the administrator password to continue.";
@@ -131,6 +133,22 @@ function showAdminLoginPage() {
 
 function hideAdminLoginPage() {
   $("adminLoginDialog").hidden = true;
+  document.body.classList.remove("admin-login-open");
+}
+
+function renderAccessGate() {
+  const access = state.access || { isApproved: true };
+  const denied = access.isApproved === false;
+  $("accessDeniedScreen").hidden = !denied;
+  document.body.classList.toggle("access-denied", denied);
+  if (!denied) return;
+  document.title = "Access denied | JackPeek";
+  $("accessDeniedReason").textContent =
+    access.message ||
+    "This Windows account is not approved to use JackPeek on this workstation.";
+  $("accessDeniedAccount").textContent = access.account
+    ? `Detected account: ${access.account}`
+    : "Detected account could not be normalized.";
 }
 
 function showTab(name, updateUrl = true) {
@@ -571,6 +589,8 @@ function renderAdminWorkspace() {
   $("currentAdminPasswordInput").required = Boolean(admin.isConfigured);
   $("adminWindowsUser").textContent =
     state.workstation?.userName || "User identity not recorded";
+  $("adminApprovedAccount").textContent =
+    state.access?.account || "Not normalized";
   $("adminMachine").textContent =
     state.workstation?.machineName || "Local workstation";
   $("adminIdentityRecording").textContent = state.settings?.includeWindowsUser
@@ -588,6 +608,9 @@ function renderAdminWorkspace() {
     state.settings?.storageMode || "local-nas-mirror";
   $("adminArchiveRepository").textContent =
     state.settings?.archiveMirrorPath || "Not configured";
+  $("approvedUsersList").innerHTML = (state.access?.approvedUsers || [])
+    .map((user) => `<li>${escapeHtml(user)}</li>`)
+    .join("");
 }
 function showAdminTab(name) {
   if (!["staff", "access", "general"].includes(name)) name = "staff";
@@ -657,6 +680,8 @@ async function loadSession() {
     state.workstation = session.workstation;
     state.admin = session.admin || { isConfigured: false, isUnlocked: false };
     state.pendingCache = session.pendingCache || [];
+    state.access = session.access || state.access;
+    renderAccessGate();
     $("sessionMachine").textContent =
       session.workstation?.machineName || "Local workstation";
     $("sessionUser").textContent =
@@ -717,6 +742,8 @@ async function saveSettings(event) {
     state.workstation = session.workstation;
     state.admin = { ...(session.admin || state.admin), isUnlocked: state.admin.isUnlocked };
     state.pendingCache = session.pendingCache || [];
+    state.access = session.access || state.access;
+    renderAccessGate();
     $("sessionUser").textContent =
       session.workstation?.userName || "User identity not recorded";
     applyLicense(session.license);

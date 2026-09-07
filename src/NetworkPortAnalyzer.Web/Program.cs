@@ -28,6 +28,7 @@ builder.Services.AddSingleton<PortLedgerStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddSingleton<AdminService>();
+builder.Services.AddSingleton<AccessPolicyService>();
 builder.Services.AddHostedService<EvidenceSyncService>();
 
 var app = builder.Build();
@@ -76,16 +77,18 @@ app.MapGet("/api/adapters", (WindowsAdapterService windows, PassiveCaptureServic
     return Results.Ok(capture.GetCaptureDevices(adapters));
 });
 
-app.MapGet("/api/session", (WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin) =>
+app.MapGet("/api/session", (WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin, AccessPolicyService access) =>
 {
     var settings = evidence.GetSettings();
+    var accessIdentity = identity.Capture(includeWindowsUser: true);
     return Results.Ok(new
     {
         workstation = identity.Capture(settings.IncludeWindowsUser),
         settings,
         license = licenses.GetStatus(),
         admin = admin.GetStatus(),
-        pendingCache = evidence.ListPendingCache()
+        pendingCache = evidence.ListPendingCache(),
+        access = access.Evaluate(accessIdentity)
     });
 });
 

@@ -16,6 +16,7 @@ var tests = new (string Name, Action Test)[]
     ("parses CDP switch identity and VLANs", Tests.ParseCdp),
     ("ignores unrelated Ethernet frames", Tests.IgnoreOtherTraffic),
     ("filters to physical wired Ethernet adapters", Tests.FilterEthernetAdapters),
+    ("approves only configured Windows accounts", Tests.AccessPolicyApprovesConfiguredAccounts),
     ("rejects a license for another product", Tests.RejectsWrongLicenseProduct),
     ("rejects an expired license", Tests.RejectsExpiredLicense),
     ("retains unknown LLDP and CDP fields as hex", Tests.UnknownTlvs),
@@ -51,6 +52,33 @@ return failed == 0 ? 0 : 1;
 
 internal static class Tests
 {
+    public static void AccessPolicyApprovesConfiguredAccounts()
+    {
+        var service = new AccessPolicyService();
+        var now = DateTimeOffset.UtcNow;
+        var approved = service.Evaluate(new WorkstationIdentity(
+            "FIELD-LAPTOP-1",
+            "RWJBH",
+            "Joshua Alvarez",
+            "S-1-5-21-fixture",
+            "Windows",
+            "1.0",
+            now));
+        var denied = service.Evaluate(new WorkstationIdentity(
+            "FIELD-LAPTOP-2",
+            "RWJBH",
+            "Unlisted User",
+            "S-1-5-21-other",
+            "Windows",
+            "1.0",
+            now));
+
+        Assert(approved.IsApproved, "Joshua Alvarez is pre-approved");
+        Assert(approved.Account == "joshua.alvarez@rwjbh.org", "Windows display name normalized to RWJBH email");
+        Assert(approved.ApprovedUsers.Contains("darien.valerin@rwjbh.org"), "Darien Valerin remains pre-approved");
+        Assert(!denied.IsApproved, "unlisted users are not approved");
+    }
+
     public static void PortLedgerRows()
     {
         var now = DateTimeOffset.UtcNow;
