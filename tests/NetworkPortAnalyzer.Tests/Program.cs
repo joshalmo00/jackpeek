@@ -194,7 +194,8 @@ internal static class Tests
         var now = DateTimeOffset.UtcNow;
         var record = new EvidenceRecord("fixture", now,
             new WorkstationIdentity("TEST", null, null, null, "Windows", "1.0.0", now),
-            new EvidenceSettings(true, false, "C:\\Test", null, 30, true, false, false, 0, false, false, ["json"]),
+            new EvidenceSettings(true, false, "C:\\Test", null, 30, true, false, false, 0, false, false, ["json"],
+                EvidenceStore.StorageLocalOnly, "C:\\Test\\Cache", 24, [3, 2], 60, true),
             new ScanResult("fixture", "adapter", now, now, 0, [], null), "record-checksum-is-not-a-file-checksum");
         using var zip = new ZipArchive(new MemoryStream(EvidenceExport.Package(record, "<h1>Fixture</h1>")), ZipArchiveMode.Read);
         using var stream = zip.GetEntry("jackpeek-evidence-fixture.json")!.Open();
@@ -337,7 +338,8 @@ internal static class Tests
     }
 
     private static EvidenceSettings TestSettings(string localPath, string? archivePath) =>
-        new(true, true, localPath, archivePath, 30, true, false, false, 0, false, true, ["json"]);
+        new(true, true, localPath, archivePath, 30, true, false, false, 0, false, true, ["json"],
+            EvidenceStore.StorageLocalAndNasMirror, Path.Combine(localPath, "Cache"), 24, [3, 2], 60, true);
 
     private static EvidenceRecord Evidence(string scanId, DateTimeOffset createdAt, IReadOnlyList<Observation> observations)
     {
