@@ -72,7 +72,23 @@ Every release should include the executable, MSI, and matching `.sha256` files.
 
 To create an offline license, use `scripts\New-JackPeekLicense.ps1` from a secured administrative workstation. The private signing key must remain outside the repository and outside the installed application. Import the resulting `.lic` file in the Settings tab.
 
-Enterprise deployments can require a valid license, enable Windows DPAPI evidence protection, define retention, disable evidence deletion, and lock settings. These controls are local policy foundations for a later Group Policy provider.
+Enterprise deployments can require a valid license, enable Windows DPAPI evidence protection, define retention, disable evidence deletion, and lock settings. Storage can be local-only, local with NAS mirror, or NAS-only with encrypted temporary local cache.
+
+NAS-only deployments should configure:
+
+```text
+Storage mode: NAS only + encrypted temporary cache
+NAS / shared archive: \\NAS\JackPeekReports
+Cache expiration: 24 hours
+Warning hours: 3,2
+Sync interval: 60 minutes
+```
+
+In NAS-only mode, JackPeek keeps a local encrypted cache only while the NAS is unavailable. When the NAS becomes available, JackPeek writes a unique evidence file under the switch identity, port, and date folder, verifies the SHA-256, and deletes the local cache copy. Switch identity uses switch name plus management IP when available, then falls back to management IP or chassis ID. If the cache cannot sync before expiration, it is deleted according to policy and the warning appears in the UI and audit log.
+
+Switch history correlation uses the same advertised port plus at least 2 of 3 identity fields: switch name, management IP, and chassis/MAC ID. If only one field matches, JackPeek treats it as a new switch identity but still creates an admin-only `.admin-review.json` sidecar beside the NAS evidence. If exactly two fields match, JackPeek keeps the review history together but records an admin-only audit event so networking can verify whether the switch was renamed, re-IPed, moved, or replaced.
+
+The restricted admin panel is intentionally hidden from the normal technician workflow. Click the JackPeek logo 7 times within 5 seconds to open the admin password prompt. This gesture is only UI; the password check is local and protected by a salted hash. Once unlocked, admin can update enterprise settings even when normal settings edits are blocked by local policy.
 
 ## 6. Safety rules for changes
 
@@ -82,7 +98,7 @@ Enterprise deployments can require a valid license, enable Windows DPAPI evidenc
 - Do not bundle Npcap in the release.
 - Keep LLDP/CDP parsing separated from capture code so parser tests can run without Npcap.
 - Do not publish packet payloads unrelated to LLDP/CDP.
-- Keep evidence storage local-first. NAS/shared-folder archive support must be explicit and user-configured, never hidden.
+- Keep evidence storage explicit and user/admin-configured. NAS-only mode may use encrypted temporary local cache, but must not leave a permanent local plain-text evidence copy.
 - Do not add required cloud telemetry, automatic uploads, or remote callbacks for secure deployments.
 - Keep the evidence package export local and auditable: JSON, HTML, and SHA-256 travel together in a downloadable ZIP.
 - Treat future SIEM/Syslog, ServiceNow/Jira, CMDB, and Intune/SCCM integrations as optional on-prem adapters; they must never become required runtime dependencies.

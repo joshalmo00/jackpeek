@@ -118,6 +118,13 @@ p {
   justify-content: flex-end;
 }
 
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .tabs {
   align-items: stretch;
   background: #fff;
@@ -467,6 +474,39 @@ button:disabled {
   gap: 10px;
 }
 
+.cache-warnings {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cache-warning {
+  background: #fff7e8;
+  border: 1px solid #ebd19f;
+  border-left: 4px solid var(--warn);
+  border-radius: 6px;
+  color: var(--warn);
+  padding: 10px 12px;
+}
+
+.cache-warning:not(.urgent) {
+  background: var(--steel-soft);
+  border-color: #b8ccd7;
+  border-left-color: var(--steel);
+  color: var(--steel);
+}
+
+.cache-warning strong,
+.cache-warning span {
+  display: block;
+}
+
+.cache-warning span {
+  color: inherit;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
 .observation,
 .report-row {
   padding: 14px;
@@ -587,6 +627,60 @@ a {
   justify-content: flex-end;
 }
 
+.modal-backdrop {
+  align-items: center;
+  background: rgba(9, 16, 21, .58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 20;
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}
+
+.admin-modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--teal);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(9, 16, 21, .28);
+  max-width: 620px;
+  padding: 16px;
+  width: min(620px, 100%);
+}
+
+.admin-modal header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+.admin-grid,
+.admin-panel {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+}
+
+.admin-panel {
+  border-top: 1px solid var(--line);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.admin-panel .field {
+  grid-column: span 1;
+}
+
 @media (max-width: 840px) {
   .app {
     padding: 12px;
@@ -595,7 +689,8 @@ a {
   .topbar,
   .section-head,
   .report-row,
-  .neighbor-head {
+  .neighbor-head,
+  .admin-modal header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -614,7 +709,9 @@ a {
   .status-band,
   .settings-layout,
   .settings-grid,
-  .neighbor-grid {
+  .neighbor-grid,
+  .admin-grid,
+  .admin-panel {
     grid-template-columns: 1fr;
   }
 
@@ -632,6 +729,10 @@ a {
   }
 
   .field.wide {
+    grid-column: auto;
+  }
+
+  .admin-panel .field {
     grid-column: auto;
   }
 }
