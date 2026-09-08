@@ -6,7 +6,6 @@ const state = {
   settings: null,
   license: null,
   reports: [],
-  portLog: [],
   result: null,
   ports: [],
   selectedPort: 0,
@@ -54,6 +53,41 @@ const empty = (title, detail) =>
   `<div class="empty-state">${emptySymbol}<h3>${escapeHtml(title)}</h3><p>${escapeHtml(detail)}</p></div>`;
 const selectedAdapter = () =>
   state.adapters.find((a) => a.id === $("adapterSelect").value);
+
+function normalizeWorkstation(value) {
+  if (!value) return value;
+  return {
+    ...value,
+    machineName: value.machineName || value.computerName,
+    userName: value.userName || value.account,
+    displayName: value.displayName || value.userName || value.account,
+  };
+}
+
+function normalizeAccess(value) {
+  if (!value) return value;
+  return {
+    ...value,
+    isApproved: value.isApproved ?? value.approved ?? false,
+    account: value.account || value.userName,
+    displayName: value.displayName || value.userName || value.account,
+    message:
+      value.message ||
+      (value.isApproved ?? value.approved
+        ? "This account is approved."
+        : "This Windows account is not approved."),
+  };
+}
+
+function updateSettingsTabVisibility() {
+  const adminUnlocked = Boolean(
+    state.admin?.isUnlocked || state.admin?.isAuthenticated,
+  );
+  const settingsTab = $("settings-tab");
+  settingsTab.hidden = !adminUnlocked;
+  settingsTab.setAttribute("aria-hidden", String(!adminUnlocked));
+  if (!adminUnlocked && location.hash === "#settings") showTab("capture", false);
+}
 
 async function request(path, options = {}) {
   let response;
@@ -198,14 +232,14 @@ async function enterWorkspace(tab) {
   }
   showAuthScreen(null);
   showTab(tab);
-  await Promise.allSettled([loadAdapters(), loadReports(), loadPortLog()]);
+  await Promise.allSettled([loadAdapters(), loadReports()]);
   if (state.admin.isUnlocked) await loadAccounts();
 }
 async function signInWindows() {
   $("windowsSignInBtn").disabled = true;
   $("signInStatus").textContent = "Checking account approval…";
   try {
-    state.access = await post("/api/access/login", {});
+    state.access = normalizeAccess(await post("/api/access/login", {}));
     renderAccessGate();
     if (!state.access.isApproved) showAuthScreen("accessDeniedScreen");
     else if (state.access.requiresProfile) {
@@ -254,7 +288,6 @@ function showTab(name, updateUrl = true) {
   const titles = {
     capture: "Capture",
     history: "Evidence history",
-    ports: "Port log",
     settings: "Settings",
   };
   document.title = `${titles[name] || "Capture"} | JackPeek`;
@@ -305,7 +338,6 @@ function updateControls() {
     : "Start capture";
   $("adapterSelect").disabled =
     state.busy || state.adapterLoading || !state.adapters.length;
-  $("durationInput").disabled = state.busy;
   $("refreshBtn").disabled = state.busy || state.adapterLoading;
 }
 
@@ -397,7 +429,7 @@ function updateAdapter() {
               )
             : empty(
                 "Ready to capture",
-                "Select a duration and start listening. Only information advertised by the connected switch will appear here.",
+                "Start a passive capture. Only information advertised by the connected switch will appear here.",
               );
   }
   updateControls();
@@ -454,9 +486,9 @@ function startCountdown(seconds) {
     const elapsed = (Date.now() - started) / 1000;
     const remaining = Math.max(0, Math.ceil(seconds - elapsed));
     $("progressBar").value = Math.min(100, (elapsed / seconds) * 100);
-    $("countdown").textContent = remaining ? `${remaining}s` : "Processing";
+    $("countdown").textContent = remaining ? "Listening" : "Processing";
     $("progressText").textContent = remaining
-      ? "Listening for advertisements"
+      ? "Listening for switch advertisements"
       : "Waiting for results and evidence storage";
     if (!remaining) clearInterval(state.timer);
   };
@@ -469,13 +501,7 @@ async function startScan(event) {
   if (state.busy || $("scanBtn").disabled || !$("captureForm").reportValidity())
     return;
   const adapter = selectedAdapter();
-  const seconds = Number($("durationInput").value);
-  if (
-    !Number.isInteger(seconds) ||
-    seconds < 5 ||
-    seconds > Number($("durationInput").max)
-  )
-    return;
+  const seconds = Number(state.settings?.maxCaptureDurationSeconds || 30);
   state.busy = true;
   updateControls();
   notice();
@@ -584,7 +610,7 @@ function finishScan(scan) {
       `<p>Evidence saved <span class="mono">${escapeHtml(scan.evidence.evidenceId)}</span></p><button class="button small" type="button" data-open-evidence="${escapeHtml(scan.evidence.evidenceId)}">Review evidence</button>`;
   }
   updateControls();
-  void Promise.allSettled([loadReports(), loadPortLog()]);
+  void loadReports();
 }
 
 function renderResults(error) {
@@ -850,9 +876,6 @@ function applySettings(settings) {
       control.value = settings[key] || "local-nas-mirror";
     else control.value = settings[key] ?? "";
   }
-  $("durationInput").max = String(settings.maxCaptureDurationSeconds || 120);
-  if (Number($("durationInput").value) > Number($("durationInput").max))
-    $("durationInput").value = $("durationInput").max;
   const adminLocked = settingsRequireAdminUnlock();
   $("settingsFields").disabled = !settings.allowSettingsEdit || adminLocked;
   $("saveSettingsBtn").disabled = !settings.allowSettingsEdit || adminLocked;
@@ -883,20 +906,21 @@ function applyLicense(license) {
 async function loadSession() {
   try {
     const session = await request("/api/session");
-    state.workstation = session.workstation;
+    state.workstation = normalizeWorkstation(session.workstation);
     state.admin = session.admin || { isConfigured: false, isUnlocked: false };
+    updateSettingsTabVisibility();
     state.pendingCache = session.pendingCache || [];
-    state.access = session.access || state.access;
+    state.access = normalizeAccess(session.access || state.access);
     renderAccessGate();
     $("windowsSignInBtn").disabled = false;
     $("administratorSignInBtn").disabled = false;
     $("retrySessionBtn").hidden = true;
     $("signInStatus").textContent = "";
     $("sessionMachine").textContent =
-      session.workstation?.machineName || "Local workstation";
+      state.workstation?.machineName || "Local workstation";
     $("sessionUser").textContent =
-      session.workstation?.displayName ||
-      session.workstation?.userName ||
+      state.workstation?.displayName ||
+      state.workstation?.userName ||
       "User identity not recorded";
     if (session.settings) applySettings(session.settings);
     if (session.license) applyLicense(session.license);
@@ -955,13 +979,14 @@ async function saveSettings(event) {
       ? "Settings saved."
       : "Settings saved and editing locked.";
     const session = await request("/api/session");
-    state.workstation = session.workstation;
+    state.workstation = normalizeWorkstation(session.workstation);
     state.admin = {
       ...(session.admin || state.admin),
       isUnlocked: state.admin.isUnlocked,
     };
+    updateSettingsTabVisibility();
     state.pendingCache = session.pendingCache || [];
-    state.access = session.access || state.access;
+    state.access = normalizeAccess(session.access || state.access);
     renderAccessGate();
     $("sessionUser").textContent =
       session.workstation?.displayName ||
@@ -1018,6 +1043,7 @@ async function unlockAdminFromPortal(event) {
     const result = await post("/api/admin/unlock", { password });
     state.adminToken = result.token || "";
     state.admin = { isConfigured: true, isUnlocked: true };
+    updateSettingsTabVisibility();
     $("adminPortalPasswordInput").value = "";
     $("adminConfirmInput").value = "";
     await enterWorkspace("settings");
@@ -1132,80 +1158,6 @@ async function loadReports() {
   } finally {
     $("refreshReportsBtn").disabled = false;
   }
-}
-
-async function loadPortLog() {
-  $("refreshPortsBtn").disabled = true;
-  $("portStatus").textContent = "Loading port log...";
-  try {
-    const entries = await request("/api/ports/log");
-    if (!Array.isArray(entries))
-      throw new Error("The port log could not be read.");
-    state.portLog = entries;
-    renderPortLog();
-    $("portStatus").textContent = "";
-  } catch (error) {
-    $("portStatus").textContent = error.message;
-    $("portCount").textContent = "Port log unavailable";
-    $("portLog").innerHTML = empty(
-      "Port log could not be loaded",
-      "Refresh the port log to retry. Existing evidence files have not been changed.",
-    );
-  } finally {
-    $("refreshPortsBtn").disabled = false;
-  }
-}
-
-function renderPortLog() {
-  const query = $("portSearch").value.trim().toLocaleLowerCase();
-  const rows = state.portLog.filter((item) => {
-    const entry = item.entry || {};
-    return [
-      entry.switchName,
-      entry.switchChassisId,
-      entry.switchPort,
-      entry.nativeVlan,
-      entry.voiceVlan,
-      entry.managementIp,
-      entry.userName,
-      entry.displayName,
-      entry.domainName,
-      entry.workstation,
-      entry.evidenceId,
-      entry.adapterId,
-    ].some((value) =>
-      String(value || "")
-        .toLocaleLowerCase()
-        .includes(query),
-    );
-  });
-  $("portCount").textContent = query
-    ? `${rows.length} of ${plural(state.portLog.length, "port record")}`
-    : plural(rows.length, "port record");
-  if (!rows.length) {
-    $("portLog").innerHTML = empty(
-      query ? "No matching port records" : "No port records yet",
-      query
-        ? "Try a different switch, port, VLAN, IP, user, workstation, or evidence ID."
-        : "Completed captures with advertised switch information will appear here.",
-    );
-    return;
-  }
-  $("portLog").innerHTML =
-    `<table><caption class="sr-only">Port scan log</caption><thead><tr><th scope="col">Date</th><th scope="col">Switch</th><th scope="col">Port</th><th scope="col">VLAN</th><th scope="col">Voice VLAN</th><th scope="col">Switch IP</th><th scope="col">Scanned by</th><th scope="col">Workstation</th><th scope="col">Evidence</th><th scope="col">Changes</th></tr></thead><tbody>${rows.map(renderPortRow).join("")}</tbody></table>`;
-}
-
-function renderPortRow(item) {
-  const entry = item.entry || {};
-  const changes = item.changes || [];
-  return `<tr class="${item.changedSincePrevious ? "changed-row" : ""}"><td>${escapeHtml(formatDate(entry.scannedAt))}</td><td><strong>${escapeHtml(entry.switchName || entry.switchChassisId || "Not advertised")}</strong><small class="mono"></small></td><td><strong>${escapeHtml(entry.switchPort || "Not advertised")}</strong>${entry.hasCompleteIdentity ? "" : '<small class="identity-state">Incomplete identity</small>'}</td><td>${escapeHtml(entry.nativeVlan ?? "Not advertised")}</td><td>${escapeHtml(entry.voiceVlan ?? "Not advertised")}</td><td class="mono">${escapeHtml(entry.managementIp || "Not advertised")}</td><td>${escapeHtml(entry.displayName || entry.userName || "Not recorded")}</td><td>${escapeHtml(entry.workstation || "Not recorded")}</td><td><button class="button small" type="button" data-report="${escapeHtml(entry.evidenceId)}">Review</button><small class="mono">${escapeHtml(entry.evidenceId || "Not recorded")}</small></td><td>${renderChanges(changes, entry.hasCompleteIdentity)}</td></tr>`;
-}
-
-function renderChanges(changes, hasCompleteIdentity) {
-  if (!hasCompleteIdentity)
-    return '<span class="badge warning">Incomplete identity</span>';
-  if (!changes.length) return '<span class="badge success">No change</span>';
-  return `<div class="change-list"><span class="badge warning">${escapeHtml(plural(changes.length, "change"))}</span><details><summary>Changed fields</summary><dl>${changes.map((change) => `<div><dt>${escapeHtml(change.field)}</dt><dd>${escapeHtml(change.previous || "Not advertised")} to ${escapeHtml(change.current || "Not advertised")}</dd></div>`).join("")}</dl></details></div>`;
 }
 
 function renderReports() {
@@ -1353,8 +1305,6 @@ document
 $("licenseFileInput").addEventListener("change", importLicense);
 $("refreshReportsBtn").addEventListener("click", loadReports);
 $("reportSearch").addEventListener("input", renderReports);
-$("refreshPortsBtn").addEventListener("click", loadPortLog);
-$("portSearch").addEventListener("input", renderPortLog);
 $("reports").addEventListener("click", (event) => {
   const button = event.target.closest("[data-report]");
   if (button) void openReport(button.dataset.report);
@@ -1364,13 +1314,6 @@ $("lastEvidence").addEventListener("click", (event) => {
   if (button) {
     showTab("history");
     void openReport(button.dataset.openEvidence);
-  }
-});
-$("portLog").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-report]");
-  if (button) {
-    showTab("history");
-    void openReport(button.dataset.report);
   }
 });
 $("npcapDismissBtn").addEventListener("click", hideNpcapDialog);

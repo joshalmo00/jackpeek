@@ -21,7 +21,7 @@
       <div class="auth-card entry-card">
         <div class="auth-brand">
           <img src="/assets/port-checker.png" width="56" height="56" alt="" />
-          <div><strong>JackPeek</strong><span>Designed by SysSummit</span></div>
+          <div><strong>JackPeek</strong><span>Designed by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span></div>
         </div>
         <p class="workspace-label">Ethernet discovery &amp; evidence</p>
         <h1 id="signInTitle" tabindex="-1">Secure access</h1>
@@ -86,7 +86,7 @@
       <div class="auth-card">
         <div class="auth-brand">
           <img src="/assets/port-checker.png" width="56" height="56" alt="" />
-          <div><strong>JackPeek</strong><span>Designed by SysSummit</span></div>
+          <div><strong>JackPeek</strong><span>Designed by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span></div>
         </div>
         <span class="badge success">Account approved</span>
         <h1 id="profileTitle" tabindex="-1">Introduce yourself</h1>
@@ -127,8 +127,8 @@
     >
       <div class="auth-card access-card">
         <div class="auth-brand">
-          <strong>SysSummit</strong>
-          <span>JackPeek</span>
+          <b class="sys-summit-wordmark sys-summit-wordmark-large"><i>SYS</i>SUMMIT</b>
+          <span>JackPeek product access</span>
         </div>
         <p class="workspace-label">Ethernet discovery</p>
         <div class="denied-icon" aria-hidden="true">
@@ -183,7 +183,7 @@
             height="36"
             alt=""
           /><span>JackPeek</span></a
-        ><span class="product-label">Ethernet discovery</span>
+        ><span class="product-label">Network discovery</span>
         <div class="workstation">
           <span id="sessionMachine">Local workstation</span
           ><span class="version">v1.0</span
@@ -224,18 +224,6 @@
             Evidence history
           </button>
           <button
-            id="ports-tab"
-            type="button"
-            class="tab"
-            role="tab"
-            aria-selected="false"
-            aria-controls="ports"
-            tabindex="-1"
-            data-tab="ports"
-          >
-            Port log
-          </button>
-          <button
             id="settings-tab"
             type="button"
             class="tab"
@@ -248,7 +236,7 @@
             Settings
           </button>
         </div>
-        <span class="nav-note">Passive discovery</span>
+        <span class="nav-note">Passive only</span>
       </div>
     </div>
     <main id="main" class="shell main" tabindex="-1">
@@ -296,16 +284,7 @@
               >Ethernet adapter<select id="adapterSelect" required disabled>
                 <option value="">Loading adapters...</option>
               </select></label
-            ><label class="duration-control" for="durationInput"
-              >Duration (seconds)<input
-                id="durationInput"
-                type="number"
-                min="5"
-                max="120"
-                step="1"
-                value="30"
-                required /></label
-            ><button id="scanBtn" class="button primary" type="submit" disabled>
+            ><button id="scanBtn" class="button primary capture-action" type="submit" disabled>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 5 10 7-10 7z" /></svg
               ><span>Start capture</span></button
@@ -386,8 +365,7 @@
           <div>
             <h1>Evidence history</h1>
             <p>
-              Review and export the most recent 100 captures in your configured
-              history folder.
+              Review every saved capture from this system and export its evidence.
             </p>
           </div>
           <button id="refreshReportsBtn" class="button secondary" type="button">
@@ -415,33 +393,6 @@
           aria-label="Selected evidence report"
           hidden
         ></section>
-      </section>
-      <section id="ports" role="tabpanel" aria-labelledby="ports-tab" hidden>
-        <div class="page-heading">
-          <div>
-            <h1>Port log</h1>
-            <p>
-              Track repeated captures by switch port and review changes over
-              time.
-            </p>
-          </div>
-          <button id="refreshPortsBtn" class="button secondary" type="button">
-            Refresh port log
-          </button>
-        </div>
-        <div class="panel history-panel">
-          <div class="history-toolbar">
-            <label class="search-label" for="portSearch"
-              >Find a port<input
-                id="portSearch"
-                type="search"
-                placeholder="Switch, port, VLAN, IP, user, workstation, or evidence ID"
-                autocomplete="off" /></label
-            ><span id="portCount" class="secondary-text">Loading port log</span>
-          </div>
-          <p id="portStatus" class="inline-status" role="status"></p>
-          <div id="portLog" class="table-scroll"></div>
-        </div>
       </section>
       <section
         id="settings"
@@ -1017,7 +968,7 @@
           <img src="/assets/port-checker.png" width="44" height="44" alt="" />
           <div>
             <strong>JackPeek</strong>
-            <span>SysSummit administration</span>
+            <span>Administration by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span>
           </div>
         </div>
         <p class="workspace-label">Administrator access</p>

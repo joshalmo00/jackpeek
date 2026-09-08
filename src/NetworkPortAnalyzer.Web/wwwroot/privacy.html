@@ -90,7 +90,7 @@
                 identity is enabled. This setting is enabled by default.
               </li>
               <li>
-                Port log rows for observed switch ports, including scan date,
+                Evidence history records for observed switch ports, including scan date,
                 switch, port, VLANs, management address, workstation, scanner
                 identity when enabled, and links back to the saved evidence.
               </li>
@@ -116,7 +116,7 @@
               Account Manager stores approved Windows domain usernames, access
               status, and first and last names in <code>accounts.json</code> in
               this local application folder. Names are requested at first login
-              and included in future evidence, exports, and port log entries
+              and included in future evidence, exports, and evidence history
               when identity recording is enabled. Disabling an account retains
               its name and does not change historical records. The account
               directory is local to this installation and is not mirrored to NAS.
@@ -126,11 +126,12 @@
               path. If archive mirroring is allowed and a destination is
               configured, new evidence is also copied there when the location is
               reachable. Port log rows are saved under a
-              <code>PortLedger</code> folder in the history location and mirrored
-              under <code>PortLedger</code> in the archive location when
-              configured. These locations are controlled by you or your
-              organization. A local save can succeed even if an archive copy
-              fails.
+              The application maintains its evidence history in the configured
+              history location. A local port ledger may also be maintained for
+              identity matching and change detection, but it is not exposed as
+              a separate user-facing panel. These locations are controlled by
+              you or your organization. A local save can succeed even if an
+              archive copy fails.
             </p>
             <p>
               New evidence files are not encrypted by default. Optional Windows

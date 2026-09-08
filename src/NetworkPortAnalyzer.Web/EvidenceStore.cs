@@ -197,7 +197,6 @@ public sealed class EvidenceStore
             .GroupBy(summary => summary.EvidenceId)
             .Select(group => group.OrderBy(summary => StorageRank(summary.StorageState)).First())
             .OrderByDescending(summary => summary.CreatedAt)
-            .Take(100)
             .ToArray();
     }
 
