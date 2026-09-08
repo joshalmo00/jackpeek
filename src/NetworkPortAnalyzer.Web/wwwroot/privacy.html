@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy | JackPeek</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="brand" href="/" aria-label="JackPeek capture"
+          ><img
+            src="/assets/port-checker.png"
+            width="36"
+            height="36"
+            alt=""
+          /><span>JackPeek</span></a
+        ><span class="product-label">Ethernet discovery</span>
+        <div class="workstation">
+          <span>Data and usage</span><span class="version">v1.0</span>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="shell main legal-main" tabindex="-1">
+      <a class="legal-back" href="/#settings">Back to JackPeek</a>
+      <div class="legal-heading">
+        <p class="eyebrow">Data and usage</p>
+        <h1>Privacy Policy</h1>
+        <p>JackPeek 1.0 · Updated September 5, 2026</p>
+        <p>
+          This policy describes the Windows application distributed through the
+          JackPeek project. It does not cover GitHub, Npcap, or other external
+          websites.
+        </p>
+      </div>
+      <div class="legal-layout">
+        <nav class="legal-toc" aria-label="Privacy policy sections">
+          <strong>On this page</strong><a href="#overview">Local operation</a
+          ><a href="#records">Information recorded</a
+          ><a href="#storage">Storage and sharing</a
+          ><a href="#retention">Retention and removal</a
+          ><a href="#choices">Your controls</a
+          ><a href="#contact">Questions and changes</a>
+        </nav>
+        <article class="panel legal-content">
+          <section id="overview">
+            <h2>1. Local operation</h2>
+            <p>
+              JackPeek starts a web server bound to <code>127.0.0.1</code> and
+              opens an interface in your browser. The interface, fonts, and
+              graphics are bundled with the application. This version does not
+              include analytics, advertising, tracking cookies, or an automatic
+              connection to a JackPeek cloud service.
+            </p>
+            <p>
+              Passive capture listens for LLDP and CDP advertisements on a
+              selected wired Ethernet adapter. It does not send discovery
+              probes. Windows, your browser, network storage, and separately
+              installed capture drivers may perform their own network activity.
+            </p>
+          </section>
+          <section id="records">
+            <h2>2. Information recorded</h2>
+            <p>
+              The application reads available Ethernet adapter names,
+              descriptions, identifiers, MAC addresses, link states, and
+              assigned IP addresses to display adapter status.
+            </p>
+            <p>Saved capture evidence includes:</p>
+            <ul>
+              <li>
+                A capture ID, timestamps, adapter ID, frame count, errors, and
+                decoded LLDP/CDP observations.
+              </li>
+              <li>
+                Advertised device and chassis identity, switch port, management
+                address, VLANs, capabilities, system details, and protocol TLVs.
+                Unknown TLV values are represented as hex. Unrelated packet
+                payloads are not displayed or saved as evidence.
+              </li>
+              <li>
+                Workstation name, operating system, application version,
+                evidence settings, configured paths, and a checksum.
+              </li>
+              <li>
+                Windows username, domain, and user SID when recording user
+                identity is enabled. This setting is enabled by default.
+              </li>
+              <li>
+                Port log rows for observed switch ports, including scan date,
+                switch, port, VLANs, management address, workstation, scanner
+                identity when enabled, and links back to the saved evidence.
+              </li>
+            </ul>
+            <p>
+              Local audit entries record action names, outcomes, timestamps,
+              evidence identifiers, and related details such as adapter IDs,
+              license IDs, or error messages. An imported offline license may
+              contain an organization, license identifier, machine assignment,
+              validity dates, and licensed features.
+            </p>
+          </section>
+          <section id="storage">
+            <h2>3. Storage and sharing</h2>
+            <p>
+              By default, evidence is saved in
+              <code>%LOCALAPPDATA%\JackPeek\Evidence</code>. Settings, the
+              imported license, account directory, and <code>audit.jsonl</code> are stored under
+              <code>%LOCALAPPDATA%\JackPeek</code>. Evidence and settings files
+              may contain network information and personal identifiers.
+            </p>
+            <p>
+              Account Manager stores approved Windows domain usernames, access
+              status, and first and last names in <code>accounts.json</code> in
+              this local application folder. Names are requested at first login
+              and included in future evidence, exports, and port log entries
+              when identity recording is enabled. Disabling an account retains
+              its name and does not change historical records. The account
+              directory is local to this installation and is not mirrored to NAS.
+            </p>
+            <p>
+              You can choose a different history folder, including a network
+              path. If archive mirroring is allowed and a destination is
+              configured, new evidence is also copied there when the location is
+              reachable. Port log rows are saved under a
+              <code>PortLedger</code> folder in the history location and mirrored
+              under <code>PortLedger</code> in the archive location when
+              configured. These locations are controlled by you or your
+              organization. A local save can succeed even if an archive copy
+              fails.
+            </p>
+            <p>
+              New evidence files are not encrypted by default. Optional Windows
+              DPAPI encryption ties stored files to the current Windows user. It
+              does not encrypt audit entries, settings, or exported JSON, CSV,
+              HTML, and ZIP files. An encrypted archive copy may not be readable
+              from another Windows account or workstation. Windows permissions
+              and your organization's storage and backup policies also affect
+              access.
+            </p>
+            <p>
+              JackPeek does not automatically send reports to its maintainers.
+              Anyone you give exported files or access to storage may receive
+              the information they contain. Opening a project or Npcap link
+              takes your browser to an external website subject to that
+              provider's policies.
+            </p>
+          </section>
+          <section id="retention">
+            <h2>4. Retention and removal</h2>
+            <p>
+              The default retention value is 0, which keeps evidence
+              indefinitely. A positive retention period only triggers cleanup
+              when evidence deletion is allowed and a new capture is saved.
+              Cleanup uses file modification age in the configured history
+              folder. The history screen displays the most recent 100 readable
+              records; older files may still exist.
+            </p>
+            <p>
+              When deletion is enabled, you can delete a selected local report
+              from Evidence history. Removing local evidence does not remove
+              archive copies, exported files, backups, audit entries, or
+              settings. Audit logs have no automatic expiry in this version.
+            </p>
+            <p>
+              To remove other application data, close JackPeek and remove the
+              relevant files from the configured folders using Windows, subject
+              to your organization's retention requirements. Deleting or
+              replacing the executable alone does not remove saved data.
+            </p>
+          </section>
+          <section id="choices">
+            <h2>5. Your controls</h2>
+            <p>
+              Settings lets you disable Windows user recording for future
+              captures, change storage locations, configure mirroring, enable
+              encryption for new records, and set deletion and retention
+              preferences when local policy permits editing. Changes do not
+              rewrite existing reports.
+            </p>
+            <p>
+              If your organization controls the workstation, ask its
+              administrator about access, retention, corrections, and deletion.
+              The project maintainers do not have remote access to your local
+              records through this application. Review reports before sharing
+              them and avoid placing sensitive evidence in public support
+              requests.
+            </p>
+          </section>
+          <section id="contact">
+            <h2>6. Questions and changes</h2>
+            <p>
+              For a privacy question about the application, use the contact
+              options on the
+              <a
+                href="https://github.com/joshalmo00/jackpeek"
+                target="_blank"
+                rel="noopener noreferrer"
+                >JackPeek project on GitHub</a
+              >. Public issues are visible to others; do not include personal
+              identifiers or network reports. Questions about records held by an
+              employer or other organization should go to that organization's
+              administrator.
+            </p>
+            <p>
+              Future releases may update this policy when application behavior
+              changes. The date above identifies this version of the policy.
+            </p>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer class="shell footer">
+      <span
+        >JackPeek 1.0 <span class="footer-divider">/</span> Local Ethernet
+        utility</span
+      >
+      <nav aria-label="Legal and project">
+        <a href="/privacy" aria-current="page">Privacy Policy</a
+        ><a href="/terms">Terms &amp; Conditions</a
+        ><a href="/">Return to app</a>
+      </nav>
+    </footer>
+  </body>
+</html>

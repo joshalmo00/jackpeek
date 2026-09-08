@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -25,14 +24,73 @@ builder.Services.AddSingleton<WindowsIdentityService>();
 builder.Services.AddSingleton<PassiveCaptureService>();
 builder.Services.AddSingleton<ScanRegistry>();
 builder.Services.AddSingleton<EvidenceStore>();
+builder.Services.AddSingleton<PortLedgerStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddSingleton<AdminService>();
+builder.Services.AddSingleton<AccessPolicyService>();
 builder.Services.AddHostedService<EvidenceSyncService>();
 
 var app = builder.Build();
 
+// Local browser requests must remain on the literal loopback origin. This also
+// rejects DNS-rebinding hostnames and cross-origin form submissions.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    context.Response.Headers.CacheControl = "no-store";
+    if (!LocalRequestPolicy.IsAllowedHost(context.Request.Host.Host) ||
+        !LocalRequestPolicy.IsAllowedOrigin(context.Request.Headers.Origin.ToString(), context.Connection.LocalPort) ||
+        context.Request.Headers["Sec-Fetch-Site"] == "cross-site")
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { error = "Open JackPeek using the local address printed by the application." });
+        return;
+    }
+    if (HttpMethods.IsPost(context.Request.Method) && !context.Request.HasJsonContentType())
+    {
+        context.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
+        await context.Response.WriteAsJsonAsync(new { error = "This action requires a JSON request." });
+        return;
+    }
+    try { await next(); }
+    catch (Exception ex) when (!context.Response.HasStarted)
+    {
+        app.Logger.LogWarning("Request failed with {ErrorType}.", ex.GetType().Name);
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await context.Response.WriteAsJsonAsync(new { error = "JackPeek could not complete the request. Check local storage permissions and try again." });
+    }
+});
+
+// A browser session is required for capture and saved evidence. Sign-in and
+// administrator recovery stay reachable even when the Windows account is denied.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? "";
+    var publicApi = path is "/api/session" or "/api/access/login" or "/api/access/profile" or "/api/access/logout"
+        or "/api/admin/status" or "/api/admin/unlock" or "/api/admin/password";
+    if ((path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) && !publicApi) || path.StartsWith("/reports/", StringComparison.OrdinalIgnoreCase))
+    {
+        var admin = context.RequestServices.GetRequiredService<AdminService>();
+        var access = context.RequestServices.GetRequiredService<AccessPolicyService>();
+        var identity = context.RequestServices.GetRequiredService<WindowsIdentityService>().Capture(true);
+        var adminValid = admin.ValidateToken(context.Request.Cookies["jackpeek-admin"] ?? context.Request.Headers["x-jackpeek-admin"].FirstOrDefault());
+        if (!adminValid && !access.ValidateSession(context.Request.Cookies["jackpeek-session"], identity))
+        {
+            context.Response.StatusCode = 401;
+            await context.Response.WriteAsJsonAsync(new { error = "Sign in to continue." });
+            return;
+        }
+    }
+    await next();
+});
+
 app.MapGet("/", () => ServeEmbeddedWebFile("index.html"));
+app.MapGet("/privacy", () => ServeEmbeddedWebFile("privacy.html"));
+app.MapGet("/terms", () => ServeEmbeddedWebFile("terms.html"));
 app.MapGet("/{fileName:regex(^[a-zA-Z0-9_.-]+$)}", (string fileName) => ServeEmbeddedWebFile(fileName));
 app.MapGet("/assets/{fileName:regex(^[a-zA-Z0-9_.-]+$)}", (string fileName) => ServeEmbeddedWebFile($"assets/{fileName}"));
 
@@ -42,17 +100,61 @@ app.MapGet("/api/adapters", (WindowsAdapterService windows, PassiveCaptureServic
     return Results.Ok(capture.GetCaptureDevices(adapters));
 });
 
-app.MapGet("/api/session", (WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin) =>
+app.MapGet("/api/session", (HttpRequest http, WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin, AccessPolicyService access) =>
 {
     var settings = evidence.GetSettings();
+    var accessIdentity = identity.Capture(includeWindowsUser: true);
+    var adminUnlocked = admin.ValidateToken(http.Cookies["jackpeek-admin"]);
+    var signedIn = adminUnlocked || access.ValidateSession(http.Cookies["jackpeek-session"], accessIdentity);
     return Results.Ok(new
     {
-        workstation = identity.Capture(settings.IncludeWindowsUser),
-        settings,
-        license = licenses.GetStatus(),
-        admin = admin.GetStatus(),
-        pendingCache = evidence.ListPendingCache()
+        workstation = access.Enrich(identity.Capture(settings.IncludeWindowsUser)),
+        settings = signedIn ? settings : null,
+        license = signedIn ? licenses.GetStatus() : null,
+        admin = admin.GetStatus() with { IsUnlocked = adminUnlocked },
+        pendingCache = signedIn ? evidence.ListPendingCache() : [],
+        access = access.Evaluate(accessIdentity)
     });
+});
+
+app.MapPost("/api/access/login", (HttpRequest request, HttpResponse response, WindowsIdentityService identity, AccessPolicyService access, AdminService admin, AuditLog audit) =>
+{
+    // Choosing Windows sign-in ends any existing administrator session.
+    admin.Lock(request.Cookies["jackpeek-admin"]);
+    response.Cookies.Delete("jackpeek-admin");
+    var workstation = identity.Capture(true);
+    var status = access.Evaluate(workstation);
+    var token = access.SignIn(workstation);
+    if (token is not null) response.Cookies.Append("jackpeek-session", token, SessionCookie());
+    audit.Write("access.login", token is not null ? "success" : status.IsApproved ? "profile-required" : "denied");
+    return Results.Ok(status);
+});
+app.MapPost("/api/access/profile", (ProfileRequest request, WindowsIdentityService identity, AccessPolicyService access) =>
+{
+    try { access.RegisterName(identity.Capture(true), request.FirstName, request.LastName); return Results.Ok(new { message = "Name saved." }); }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapPost("/api/access/logout", (HttpRequest request, HttpResponse response, AccessPolicyService access, AdminService admin) =>
+{
+    access.SignOut(request.Cookies["jackpeek-session"]);
+    admin.Lock(request.Cookies["jackpeek-admin"]);
+    response.Cookies.Delete("jackpeek-session");
+    response.Cookies.Delete("jackpeek-admin");
+    return Results.Ok(new { message = "Signed out." });
+});
+app.MapGet("/api/admin/accounts", (HttpRequest http, AdminService admin, AccessPolicyService access) =>
+    admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault())
+        ? Results.Ok(access.List()) : Results.StatusCode(403));
+app.MapPost("/api/admin/accounts", (AccountApprovalRequest request, HttpRequest http, AdminService admin, AccessPolicyService access, AuditLog audit) =>
+{
+    if (!admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault())) return Results.StatusCode(403);
+    try
+    {
+        var account = access.SetApproval(request.Account, request.Enabled);
+        audit.Write("account.approval", request.Enabled ? "approved" : "disabled", detail: account.Account);
+        return Results.Ok(account);
+    }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
 
 app.MapGet("/api/license", (LicenseService licenses) => Results.Ok(licenses.GetStatus()));
@@ -68,8 +170,8 @@ app.MapPost("/api/license/import", async (HttpRequest request, LicenseService li
     }
     catch (Exception ex)
     {
-        audit.Write("license.import", "failed", detail: ex.Message);
-        return Results.BadRequest(new { error = ex.Message });
+        audit.Write("license.import", "failed", detail: ex.GetType().Name);
+        return Results.BadRequest(new { error = "The license could not be imported. Check its format, signature, validity dates, and workstation assignment." });
     }
 });
 
@@ -79,8 +181,9 @@ app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpReque
 {
     try
     {
-        var adminUnlocked = admin.GetStatus().IsConfigured && admin.ValidateToken(http.Headers["x-jackpeek-admin"].FirstOrDefault());
-        if (admin.GetStatus().IsConfigured && !adminUnlocked)
+        var adminStatus = admin.GetStatus();
+        var adminUnlocked = adminStatus.IsConfigured && admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault());
+        if (adminStatus.IsConfigured && !adminUnlocked)
         {
             audit.Write("settings.update", "blocked", detail: "admin unlock required");
             return Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -92,15 +195,22 @@ app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpReque
     }
     catch (Exception ex)
     {
-        audit.Write("settings.update", "failed", detail: ex.Message);
-        return Results.BadRequest(new { error = ex.Message });
+        audit.Write("settings.update", "failed", detail: ex.GetType().Name);
+        return Results.BadRequest(new { error = ex is InvalidOperationException ? ex.Message : "Settings could not be saved. Check folder paths, permissions, and free disk space." });
     }
 });
 
 app.MapGet("/api/evidence/cache", (EvidenceStore evidence) => Results.Ok(evidence.ListPendingCache()));
 
-app.MapPost("/api/evidence/sync", (EvidenceStore evidence, AuditLog audit) =>
+app.MapPost("/api/evidence/sync", (HttpRequest http, EvidenceStore evidence, AdminService admin, AuditLog audit) =>
 {
+    var adminStatus = admin.GetStatus();
+    if (adminStatus.IsConfigured && !admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault()))
+    {
+        audit.Write("evidence.cache.sync", "blocked", detail: "admin unlock required");
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     var result = evidence.SyncPendingCache();
     audit.Write("evidence.cache.sync", result.Failed == 0 ? "success" : "partial", detail: $"pending={result.PendingBefore}; uploaded={result.Uploaded}; deletedExpired={result.DeletedExpired}; failed={result.Failed}; lastError={result.LastError}");
     return Results.Ok(result);
@@ -108,9 +218,10 @@ app.MapPost("/api/evidence/sync", (EvidenceStore evidence, AuditLog audit) =>
 
 app.MapGet("/api/admin/status", (AdminService admin) => Results.Ok(admin.GetStatus()));
 
-app.MapPost("/api/admin/unlock", (AdminUnlockRequest request, AdminService admin, AuditLog audit) =>
+app.MapPost("/api/admin/unlock", (AdminUnlockRequest request, HttpResponse response, AdminService admin, AuditLog audit) =>
 {
     var result = admin.Unlock(request.Password);
+    if (result.Unlocked) response.Cookies.Append("jackpeek-admin", result.Token!, SessionCookie());
     audit.Write("admin.unlock", result.Unlocked ? "success" : "failed");
     return result.Unlocked ? Results.Ok(result) : Results.Unauthorized();
 });
@@ -125,12 +236,16 @@ app.MapPost("/api/admin/password", (AdminPasswordRequest request, AdminService a
     }
     catch (Exception ex)
     {
-        audit.Write("admin.password", "failed", detail: ex.Message);
-        return Results.BadRequest(new { error = ex.Message });
+        audit.Write("admin.password", "failed", detail: ex.GetType().Name);
+        return Results.BadRequest(new { error = ex is InvalidOperationException ? ex.Message : "Admin password could not be saved." });
     }
 });
 
 app.MapGet("/api/reports", (EvidenceStore evidence) => Results.Ok(evidence.ListReports()));
+
+app.MapGet("/api/ports/log", (PortLedgerStore ledger) => Results.Ok(ledger.List()));
+app.MapGet("/api/ports/history", (string? switchName, string? chassisId, string port, string? excludeEvidenceId, DateTimeOffset? before, PortLedgerStore ledger) =>
+    Results.Ok(ledger.History(switchName, chassisId, port, excludeEvidenceId, before)));
 
 app.MapGet("/api/reports/{evidenceId}", (string evidenceId, EvidenceStore evidence) =>
     evidence.TryReadRecord(evidenceId) is { } record ? Results.Ok(record) : Results.NotFound(new { error = "Report not found." }));
@@ -163,69 +278,24 @@ app.MapGet("/api/reports/{evidenceId}/download", (string evidenceId, EvidenceSto
         return Results.NotFound(new { error = "Report not found." });
     }
 
-    var json = System.Text.Json.JsonSerializer.Serialize(record, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    });
-    return Results.File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"jackpeek-evidence-{evidenceId}.json");
+    return Results.File(EvidenceExport.Json(record), "application/json", $"jackpeek-evidence-{evidenceId}.json");
 });
 
 app.MapGet("/api/reports/{evidenceId}/csv", (string evidenceId, EvidenceStore evidence, AuditLog audit) =>
 {
     var record = evidence.TryReadRecord(evidenceId);
-    if (record is null)
-    {
-        return Results.NotFound(new { error = "Report not found." });
-    }
-
-    var rows = new List<string> { "evidenceId,createdAt,protocol,device,port,managementAddress,nativeVlan,voiceVlan,frames" };
-    rows.AddRange(record.Scan.Observations.Select(observation =>
-    {
-        var packet = observation.Latest;
-        return string.Join(',', new[]
-        {
-            Csv(record.EvidenceId), Csv(record.CreatedAt.ToString("O")), Csv(observation.Protocol),
-            Csv(packet.DeviceName ?? packet.ChassisId), Csv(packet.PortDescription ?? packet.PortId),
-            Csv(packet.ManagementAddress), Csv(packet.NativeVlan?.ToString()), Csv(packet.VoiceVlan?.ToString()),
-            Csv(observation.FramesSeen.ToString())
-        });
-    }));
+    if (record is null) return Results.NotFound(new { error = "Report not found." });
     audit.Write("evidence.export", "success", evidenceId, "csv");
-    return Results.File(System.Text.Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, rows) + Environment.NewLine), "text/csv", $"jackpeek-evidence-{evidenceId}.csv");
+    return Results.File(EvidenceExport.Csv(record), "text/csv", $"jackpeek-evidence-{evidenceId}.csv");
 });
 
 app.MapGet("/api/reports/{evidenceId}/package", (string evidenceId, EvidenceStore evidence, AuditLog audit) =>
 {
     var record = evidence.TryReadRecord(evidenceId);
-    if (record is null)
-    {
-        return Results.NotFound(new { error = "Report not found." });
-    }
-
-    var json = System.Text.Json.JsonSerializer.Serialize(record, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    });
-    var html = evidence.BuildHtmlReport(record);
-    using var package = new MemoryStream();
-    using (var archive = new ZipArchive(package, ZipArchiveMode.Create, true))
-    {
-        AddEntry(archive, $"jackpeek-evidence-{evidenceId}.json", json);
-        AddEntry(archive, $"jackpeek-evidence-{evidenceId}.html", html);
-        AddEntry(archive, $"jackpeek-evidence-{evidenceId}.sha256", $"{record.Sha256}  jackpeek-evidence-{evidenceId}.json\n");
-        AddEntry(archive, "manifest.json", System.Text.Json.JsonSerializer.Serialize(new
-        {
-            product = "JackPeek",
-            evidenceId,
-            createdAt = record.CreatedAt,
-            sha256 = record.Sha256,
-            passiveOnly = true,
-            contents = new[] { "JSON", "HTML", "SHA-256" }
-        }, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
-    }
-
+    if (record is null) return Results.NotFound(new { error = "Report not found." });
+    var package = EvidenceExport.Package(record, evidence.BuildHtmlReport(record));
     audit.Write("evidence.export", "success", evidenceId, "package");
-    return Results.File(package.ToArray(), "application/zip", $"jackpeek-evidence-{evidenceId}.zip");
+    return Results.File(package, "application/zip", $"jackpeek-evidence-{evidenceId}.zip");
 });
 
 app.MapGet("/reports/{evidenceId}.html", (string evidenceId, EvidenceStore evidence) =>
@@ -236,7 +306,7 @@ app.MapGet("/reports/{evidenceId}.html", (string evidenceId, EvidenceStore evide
         : Results.Text(evidence.BuildHtmlReport(record), "text/html; charset=utf-8");
 });
 
-app.MapPost("/api/scans", (ScanRequest request, ScanRegistry scans, PassiveCaptureService capture, EvidenceStore evidence, LicenseService licenses, AuditLog audit) =>
+app.MapPost("/api/scans", (ScanRequest request, ScanRegistry scans, PassiveCaptureService capture, EvidenceStore evidence, PortLedgerStore ledger, LicenseService licenses, AuditLog audit, WindowsAdapterService windows, WindowsIdentityService identity, AccessPolicyService access) =>
 {
     if (string.IsNullOrWhiteSpace(request.AdapterId))
     {
@@ -251,31 +321,58 @@ app.MapPost("/api/scans", (ScanRequest request, ScanRegistry scans, PassiveCaptu
         return Results.StatusCode(StatusCodes.Status402PaymentRequired);
     }
 
+    if (!windows.GetAdapters().Any(adapter => string.Equals(adapter.Id, request.AdapterId, StringComparison.OrdinalIgnoreCase)))
+    {
+        return Results.BadRequest(new { error = "Select a physical wired Ethernet adapter from the current adapter list." });
+    }
+
+    var scanner = access.Enrich(identity.Capture(settings.IncludeWindowsUser));
     var scanId = Guid.NewGuid().ToString("n");
     audit.Write("capture.start", "accepted", scanId, request.AdapterId);
-    scans.Set(scanId, new ScanStatus(scanId, "running", null, null, null));
+    if (!scans.TryStart(scanId))
+    {
+        return Results.Conflict(new { error = "Another capture is running. Wait for it to finish before starting a new capture." });
+    }
     _ = Task.Run(async () =>
     {
         var seconds = Math.Clamp(request.DurationSeconds ?? 30, 5, settings.MaxCaptureDurationSeconds);
-        var result = await capture.ScanAsync(scanId, request.AdapterId, TimeSpan.FromSeconds(seconds), CancellationToken.None);
+        ScanResult result;
+        try
+        {
+            result = await capture.ScanAsync(scanId, request.AdapterId, TimeSpan.FromSeconds(seconds), app.Lifetime.ApplicationStopping);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning("Capture failed with {ErrorType}.", ex.GetType().Name);
+            result = new ScanResult(scanId, request.AdapterId, DateTimeOffset.Now, DateTimeOffset.Now, 0, [],
+                "Capture could not complete. Refresh adapters and check Npcap access before retrying.");
+        }
         EvidenceSummary? summary = null;
         string? error = result.Error;
         try
         {
-            summary = evidence.SaveScan(result);
+            var saved = evidence.SaveScan(result, scanner);
+            summary = saved.Summary;
             if (summary.AdminReviewRequired)
             {
                 audit.Write("switch.identity.review", "admin-review-required", summary.EvidenceId, summary.AdminReviewReason);
             }
+            var ledgerResult = ledger.Save(saved.Record);
+            audit.Write("port-log.write", "success", scanId, $"{ledgerResult.EntriesWritten} entries");
+            if (ledgerResult.MirrorFailures > 0)
+            {
+                audit.Write("port-log.mirror", "failed", scanId, $"{ledgerResult.MirrorFailures} entries");
+            }
         }
         catch (Exception ex)
         {
+            app.Logger.LogWarning("Evidence save failed with {ErrorType}.", ex.GetType().Name);
             error = string.IsNullOrWhiteSpace(error)
-                ? $"Capture completed, but evidence could not be saved: {ex.Message}"
-                : $"{error} Evidence could not be saved: {ex.Message}";
+                ? "Capture completed, but evidence could not be saved. Check history folder permissions and free disk space."
+                : $"{error} Evidence could not be saved. Check history folder permissions and free disk space.";
         }
 
-        scans.Set(scanId, new ScanStatus(scanId, "complete", result, summary, error));
+        scans.Set(scanId, new ScanStatus(scanId, "complete", result, summary, error, PortSnapshots.FromScan(result)));
         audit.Write("capture.complete", error is null ? "success" : "completed-with-error", scanId, error);
     });
 
@@ -295,6 +392,8 @@ if (!args.Contains("--no-browser", StringComparer.OrdinalIgnoreCase))
 }
 
 await app.WaitForShutdownAsync();
+
+static CookieOptions SessionCookie() => new() { HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/", IsEssential = true };
 
 static int? ReadPort(string[] args)
 {
@@ -324,25 +423,39 @@ static IResult ServeEmbeddedWebFile(string fileName)
         return Results.NotFound();
     }
 
-    using var reader = new StreamReader(stream);
-    return Results.Text(reader.ReadToEnd(), contentType);
+    using var buffer = new MemoryStream();
+    stream.CopyTo(buffer);
+    return Results.File(buffer.ToArray(), contentType);
 }
-
-static void AddEntry(ZipArchive archive, string name, string content)
-{
-    using var writer = new StreamWriter(archive.CreateEntry(name).Open(), System.Text.Encoding.UTF8);
-    writer.Write(content);
-}
-
-static string Csv(string? value) => $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
 
 public sealed record ScanRequest(string AdapterId, int? DurationSeconds);
 
-public sealed record ScanStatus(string ScanId, string State, ScanResult? Result, EvidenceSummary? Evidence, string? Error);
+public sealed record ScanStatus(string ScanId, string State, ScanResult? Result, EvidenceSummary? Evidence, string? Error, IReadOnlyList<PortSnapshot>? Ports = null);
 
 public sealed class ScanRegistry
 {
     private readonly ConcurrentDictionary<string, ScanStatus> _scans = new();
-    public void Set(string scanId, ScanStatus status) => _scans[scanId] = status;
+    private readonly object _gate = new();
+    private string? _runningId;
+    public bool TryStart(string scanId)
+    {
+        lock (_gate)
+        {
+            if (_runningId is not null) return false;
+            // Retain only a bounded number of completed in-memory results.
+            if (_scans.Count >= 100) _scans.Clear();
+            _runningId = scanId;
+            _scans[scanId] = new ScanStatus(scanId, "running", null, null, null);
+            return true;
+        }
+    }
+    public void Set(string scanId, ScanStatus status)
+    {
+        lock (_gate)
+        {
+            _scans[scanId] = status;
+            if (status.State == "complete" && _runningId == scanId) _runningId = null;
+        }
+    }
     public bool TryGet(string scanId, out ScanStatus? status) => _scans.TryGetValue(scanId, out status);
 }

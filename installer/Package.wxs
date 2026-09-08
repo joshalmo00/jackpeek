@@ -2,7 +2,7 @@
   <Package
     Name="JackPeek"
     Manufacturer="JackPeek"
-    Version="1.0.0"
+    Version="$(var.ProductVersion)"
     UpgradeCode="c13ee8f1-930a-4f83-a58b-9cfba16df3a8"
     Scope="perMachine">
 

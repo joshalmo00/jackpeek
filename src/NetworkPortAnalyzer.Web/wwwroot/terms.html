@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terms &amp; Conditions | JackPeek</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="brand" href="/" aria-label="JackPeek capture"
+          ><img
+            src="/assets/port-checker.png"
+            width="36"
+            height="36"
+            alt=""
+          /><span>JackPeek</span></a
+        ><span class="product-label">Ethernet discovery</span>
+        <div class="workstation">
+          <span>Data and usage</span><span class="version">v1.0</span>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="shell main legal-main" tabindex="-1">
+      <a class="legal-back" href="/#settings">Back to JackPeek</a>
+      <div class="legal-heading">
+        <p class="eyebrow">Data and usage</p>
+        <h1>Terms &amp; Conditions</h1>
+        <p>JackPeek 1.0 · Updated September 5, 2026</p>
+        <p>
+          These terms describe use of the JackPeek Windows application and its
+          evidence reports. Read them together with the Privacy Policy and any
+          license supplied with your copy.
+        </p>
+      </div>
+      <div class="legal-layout">
+        <nav class="legal-toc" aria-label="Terms sections">
+          <strong>On this page</strong><a href="#use">Authorized use</a
+          ><a href="#results">Interpreting results</a
+          ><a href="#evidence">Evidence responsibility</a
+          ><a href="#licenses">Licenses and dependencies</a
+          ><a href="#availability">Availability and limitations</a
+          ><a href="#changes">Updates and contact</a>
+        </nav>
+        <article class="panel legal-content">
+          <section id="use">
+            <h2>1. Authorized use</h2>
+            <p>
+              Use JackPeek only on devices and networks you own or have
+              permission to investigate. Follow applicable law and your
+              organization's security, monitoring, and retention policies.
+              Passive capture still requires appropriate authorization to
+              observe and retain network information.
+            </p>
+            <p>
+              You are responsible for the workstation, browser, capture driver,
+              storage paths, and people who can access them. Do not expose the
+              local interface through a proxy or tunnel to an untrusted network.
+              If you do not agree to these conditions, stop using the
+              application.
+            </p>
+          </section>
+          <section id="results">
+            <h2>2. Interpreting results</h2>
+            <p>
+              JackPeek listens for advertised LLDP and CDP information. It does
+              not verify switch ownership or identity, authenticate
+              advertisements, validate every network configuration, or certify a
+              cable, switch port, or network.
+            </p>
+            <p>
+              A missing result does not establish that a device is absent or a
+              port is faulty. A missing field means no value was available from
+              the decoded advertisement. Devices can provide incomplete,
+              outdated, conflicting, or inaccurate information. Confirm findings
+              through your approved operational processes before making changes.
+            </p>
+            <p>
+              A checksum comparison checks whether a record matches its stored
+              checksum. It is not a digital signature, proof of authorship, or
+              an independent guarantee that a record has never been altered.
+            </p>
+          </section>
+          <section id="evidence">
+            <h2>3. Evidence responsibility</h2>
+            <p>
+              You control capture activity, report storage, export, and sharing.
+              Reports may contain sensitive network information, workstation
+              details, and personal identifiers. Review the
+              <a href="/privacy">Privacy Policy</a> and configure identity,
+              encryption, mirroring, and retention to suit your requirements.
+            </p>
+            <p>
+              Maintain any backups you need. Archive mirroring depends on
+              storage availability and can fail independently of local saving.
+              Local deletion does not remove copies or exports. Exported reports
+              are readable even when the stored source record was encrypted.
+            </p>
+          </section>
+          <section id="licenses">
+            <h2>4. Licenses and dependencies</h2>
+            <p>
+              Source code, binaries, and third-party components are subject to
+              the licenses distributed with them. These usage terms do not grant
+              additional redistribution rights or replace third-party license
+              obligations. Public availability of source code does not, by
+              itself, grant every right to reuse it.
+            </p>
+            <p>
+              Npcap is installed separately and governed by its own license.
+              JackPeek does not bundle or silently install Npcap. Obtain
+              dependencies from their authorized distributors and comply with
+              their terms. An offline JackPeek license, when required by local
+              policy, is validated on the workstation and may be restricted by
+              dates or machine assignment.
+            </p>
+          </section>
+          <section id="availability">
+            <h2>5. Availability and limitations</h2>
+            <p>
+              To the extent permitted by applicable law, the application is
+              provided as available and without warranties of uninterrupted
+              operation, fitness for a particular purpose, or the completeness
+              or accuracy of captured information. No support response time or
+              service availability commitment is made by this page.
+            </p>
+            <p>
+              To the extent permitted by applicable law, project maintainers and
+              contributors are not responsible for indirect or consequential
+              losses arising from use of the application, including loss of data
+              or business interruption. Nothing in these terms excludes a
+              responsibility or legal right that cannot lawfully be excluded.
+              Any separate written agreement applicable to your copy continues
+              to apply.
+            </p>
+          </section>
+          <section id="changes">
+            <h2>6. Updates and contact</h2>
+            <p>
+              New releases may change features, dependencies, and these terms.
+              Review the documents supplied with an updated version before
+              deploying it. You can stop using JackPeek at any time. Removing
+              the executable does not remove stored evidence or application
+              data.
+            </p>
+            <p>
+              Release information and project contact options are available on
+              the
+              <a
+                href="https://github.com/joshalmo00/jackpeek"
+                target="_blank"
+                rel="noopener noreferrer"
+                >JackPeek project on GitHub</a
+              >. Do not publish confidential reports or personal information in
+              public issues.
+            </p>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer class="shell footer">
+      <span
+        >JackPeek 1.0 <span class="footer-divider">/</span> Local Ethernet
+        utility</span
+      >
+      <nav aria-label="Legal and project">
+        <a href="/privacy">Privacy Policy</a
+        ><a href="/terms" aria-current="page">Terms &amp; Conditions</a
+        ><a href="/">Return to app</a>
+      </nav>
+    </footer>
+  </body>
+</html>

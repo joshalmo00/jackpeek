@@ -57,7 +57,8 @@ public sealed record WorkstationIdentity(
     string? UserSid,
     string OperatingSystem,
     string AppVersion,
-    DateTimeOffset CapturedAt);
+    DateTimeOffset CapturedAt,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null);
 
 public sealed record EvidenceSettings(
     bool SecureMode,
@@ -99,7 +100,8 @@ public sealed record EvidenceSummary(
     string? PriorReviewEvidenceId,
     int PriorReviewMatchScore,
     bool AdminReviewRequired,
-    string? AdminReviewReason);
+    string? AdminReviewReason,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null);
 
 public sealed record EvidenceRecord(
     string EvidenceId,
@@ -108,6 +110,42 @@ public sealed record EvidenceRecord(
     EvidenceSettings Settings,
     ScanResult Scan,
     string Sha256);
+
+public sealed record PortLedgerEntry(
+    string LedgerId,
+    DateTimeOffset ScannedAt,
+    string? SwitchName,
+    string? SwitchChassisId,
+    string? SwitchPort,
+    IReadOnlyList<string> Protocols,
+    int? NativeVlan,
+    int? VoiceVlan,
+    string? ManagementIp,
+    string? Duplex,
+    IReadOnlyList<string> Capabilities,
+    string Workstation,
+    string? UserName,
+    string? DomainName,
+    string? UserSid,
+    string AdapterId,
+    string EvidenceId,
+    string ScanId,
+    bool HasCompleteIdentity,
+    string? IdentityKey,
+    string? LocalJsonPath,
+    string? MirrorJsonPath,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? PortDescription = null);
+
+public sealed record PortChange(
+    string Field,
+    string? Previous,
+    string? Current);
+
+public sealed record PortLedgerSummary(
+    PortLedgerEntry Entry,
+    IReadOnlyList<PortChange> Changes,
+    bool ChangedSincePrevious);
 
 public sealed record LicenseDocument(
     string LicenseId,
