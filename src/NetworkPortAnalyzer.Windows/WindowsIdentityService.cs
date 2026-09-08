@@ -8,9 +8,10 @@ public sealed class WindowsIdentityService
 {
     public WorkstationIdentity Capture(bool includeWindowsUser)
     {
-        var identity = includeWindowsUser ? WindowsIdentity.GetCurrent() : null;
-        var userName = includeWindowsUser ? Environment.UserName : null;
-        var domainName = includeWindowsUser ? Environment.UserDomainName : null;
+        using var identity = includeWindowsUser ? WindowsIdentity.GetCurrent() : null;
+        var accountParts = identity?.Name.Split('\\', 2);
+        var userName = accountParts is { Length: 2 } ? accountParts[1] : null;
+        var domainName = accountParts is { Length: 2 } ? accountParts[0] : null;
         var userSid = includeWindowsUser ? identity?.User?.Value : null;
         var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
 

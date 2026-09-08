@@ -57,7 +57,8 @@ public sealed record WorkstationIdentity(
     string? UserSid,
     string OperatingSystem,
     string AppVersion,
-    DateTimeOffset CapturedAt);
+    DateTimeOffset CapturedAt,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null);
 
 public sealed record EvidenceSettings(
     bool SecureMode,
@@ -99,7 +100,8 @@ public sealed record EvidenceSummary(
     string? PriorReviewEvidenceId,
     int PriorReviewMatchScore,
     bool AdminReviewRequired,
-    string? AdminReviewReason);
+    string? AdminReviewReason,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null);
 
 public sealed record EvidenceRecord(
     string EvidenceId,
@@ -131,7 +133,9 @@ public sealed record PortLedgerEntry(
     bool HasCompleteIdentity,
     string? IdentityKey,
     string? LocalJsonPath,
-    string? MirrorJsonPath);
+    string? MirrorJsonPath,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? PortDescription = null);
 
 public sealed record PortChange(
     string Field,

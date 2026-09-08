@@ -12,4 +12,19 @@ Settings, optional license, and audit data use `%LOCALAPPDATA%\JackPeek`; eviden
 
 Audit writes are serialized. If an audit file cannot be written, the application reports a console warning and continues serving results; this is not a fail-closed compliance logging system. General API errors avoid exception traces. ASP.NET and Windows can produce operational logs outside the evidence subsystem.
 
+The initial sign-in page checks the Windows process token's domain and username.
+Approved accounts and first-login names are stored in local `accounts.json`;
+email addresses and display-name guesses do not grant approval. User sessions
+expire after eight hours and re-check account approval on protected requests.
+Administrator sessions use the existing password hash and a 30-minute idle
+timeout. HTTP-only, SameSite=Strict cookies carry session tokens on loopback.
+Signing out revokes the sessions; changing the administrator password revokes
+administrator sessions. Capture, report, and port-log APIs require a valid user
+or administrator session. Account-management writes require an administrator.
+Startup metadata, login, first-profile registration, and password-based recovery
+remain reachable so a denied account can reach administrator sign-in. Approvals
+are local per Windows application-data folder, not a central domain policy.
+The directory and password files rely on Windows permissions and are not a
+security boundary against their owning Windows user or a local administrator.
+
 There is no telemetry, auto-updater, remote support agent, or guaranteed vulnerability response time. Updates are manual. Signing and installer upgrade validation are pending production release work. See [SECURITY.md](../SECURITY.md) for reporting guidance.

@@ -29,13 +29,14 @@ public static class EvidenceExport
 
     public static byte[] Csv(EvidenceRecord record)
     {
-        var rows = new List<string> { "evidenceId,createdAt,protocol,device,port,managementAddress,nativeVlan,voiceVlan,frames" };
+        var rows = new List<string> { "evidenceId,createdAt,protocol,device,port,managementAddress,nativeVlan,voiceVlan,frames,scannedBy,domain,username" };
         rows.AddRange(record.Scan.Observations.Select(o => string.Join(',', new[]
         {
             record.EvidenceId, record.CreatedAt.ToString("O"), o.Protocol,
             o.Latest.DeviceName ?? o.Latest.ChassisId, o.Latest.PortId ?? o.Latest.PortDescription,
             o.Latest.ManagementAddress, o.Latest.NativeVlan?.ToString(CultureInfo.InvariantCulture),
-            o.Latest.VoiceVlan?.ToString(CultureInfo.InvariantCulture), o.FramesSeen.ToString(CultureInfo.InvariantCulture)
+            o.Latest.VoiceVlan?.ToString(CultureInfo.InvariantCulture), o.FramesSeen.ToString(CultureInfo.InvariantCulture),
+            record.Workstation.DisplayName, record.Workstation.DomainName, record.Workstation.UserName
         }.Select(CsvCell))));
         return Encoding.UTF8.GetBytes(string.Join("\r\n", rows) + "\r\n");
     }

@@ -108,9 +108,18 @@
             <p>
               By default, evidence is saved in
               <code>%LOCALAPPDATA%\JackPeek\Evidence</code>. Settings, the
-              imported license, and <code>audit.jsonl</code> are stored under
+              imported license, account directory, and <code>audit.jsonl</code> are stored under
               <code>%LOCALAPPDATA%\JackPeek</code>. Evidence and settings files
               may contain network information and personal identifiers.
+            </p>
+            <p>
+              Account Manager stores approved Windows domain usernames, access
+              status, and first and last names in <code>accounts.json</code> in
+              this local application folder. Names are requested at first login
+              and included in future evidence, exports, and port log entries
+              when identity recording is enabled. Disabling an account retains
+              its name and does not change historical records. The account
+              directory is local to this installation and is not mirrored to NAS.
             </p>
             <p>
               You can choose a different history folder, including a network

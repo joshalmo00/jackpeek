@@ -29,6 +29,8 @@ var tests = new (string Name, Action Test)[]
     ("detaches capture handlers on success and failure", Tests.CaptureCleanup),
     ("keeps neighbor groups distinct and reports conflicts", Tests.NeighborConflicts),
     ("creates port ledger rows and marks incomplete identities", Tests.PortLedgerRows),
+    ("merges complementary discovery sources without mixing ports", Tests.MergePortSources),
+    ("finds matching local and NAS port history", Tests.PortHistoryLookup),
     ("detects port ledger changes against the previous scan", Tests.PortLedgerChanges),
     ("keeps local port ledger rows when NAS mirror fails", Tests.PortLedgerMirrorFailure)
 };
@@ -54,29 +56,45 @@ internal static class Tests
 {
     public static void AccessPolicyApprovesConfiguredAccounts()
     {
-        var service = new AccessPolicyService();
-        var now = DateTimeOffset.UtcNow;
-        var approved = service.Evaluate(new WorkstationIdentity(
-            "FIELD-LAPTOP-1",
-            "RWJBH",
-            "Joshua Alvarez",
-            "S-1-5-21-fixture",
-            "Windows",
-            "1.0",
-            now));
-        var denied = service.Evaluate(new WorkstationIdentity(
-            "FIELD-LAPTOP-2",
-            "RWJBH",
-            "Unlisted User",
-            "S-1-5-21-other",
-            "Windows",
-            "1.0",
-            now));
-
-        Assert(approved.IsApproved, "Joshua Alvarez is pre-approved");
-        Assert(approved.Account == "joshua.alvarez@rwjbh.org", "Windows display name normalized to RWJBH email");
-        Assert(approved.ApprovedUsers.Contains("darien.valerin@rwjbh.org"), "Darien Valerin remains pre-approved");
-        Assert(!denied.IsApproved, "unlisted users are not approved");
+        var root = TempRoot();
+        try
+        {
+            var service = new AccessPolicyService(root);
+            var identity = new WorkstationIdentity("FIELD-LAPTOP-1", "SBHCS", "joalvarez", "test-sid", "Windows", "1.0", DateTimeOffset.UtcNow);
+            var approved = service.Evaluate(identity);
+            Assert(approved.IsApproved && approved.RequiresProfile, "approved account requires first-login name");
+            Assert(approved.Account == @"SBHCS\joalvarez", "domain identity remains exact");
+            Assert(service.SignIn(identity) is null, "profile is required before session creation");
+            Assert(!service.Evaluate(identity with { DomainName = "OTHER" }).IsApproved, "same username in another domain is denied");
+            Assert(!service.Evaluate(identity with { UserName = "Joshua Alvarez" }).IsApproved, "display name cannot authorize access");
+            Assert(!service.Evaluate(identity with { UserName = "joshua.alvarez@rwjbh.org" }).IsApproved, "email cannot authorize access");
+            Assert(service.Evaluate(identity with { DomainName = "sbhcs", UserName = "JOALVAREZ" }).IsApproved, "Windows account comparisons ignore case");
+            service.RegisterName(identity, " Joshua ", "Alvarez ");
+            var saved = new AccessPolicyService(root);
+            Assert(saved.Evaluate(identity).DisplayName == "Joshua Alvarez", "profile survives restart");
+            Assert(!saved.Evaluate(identity).RequiresProfile, "returning user does not repeat registration");
+            saved.RegisterName(identity, "Changed", "Name");
+            Assert(saved.Evaluate(identity).DisplayName == "Joshua Alvarez", "onboarding cannot overwrite existing profile");
+            var token = saved.SignIn(identity);
+            Assert(saved.ValidateSession(token, identity), "registered approved user gets a session");
+            Assert(!saved.ValidateSession(token, identity with { UserName = "other" }), "session cannot be used by another account");
+            var record = Evidence("named-scan", DateTimeOffset.UtcNow, [Observation("LLDP", "Switch", "chassis", "Gi1/0/13", 20, null, DateTimeOffset.UtcNow)]);
+            record = record with { Workstation = saved.Enrich(identity) };
+            Assert(PortLedgerStore.BuildEntries(record).Single().DisplayName == "Joshua Alvarez", "name follows evidence into port ledger");
+            Assert(record.Workstation.UserName == "joalvarez", "display name never replaces Windows username");
+            Assert(System.Text.Encoding.UTF8.GetString(EvidenceExport.Csv(record)).Contains("Joshua Alvarez"), "CSV includes saved scanner name");
+            saved.SetApproval(@"SBHCS\joalvarez", false);
+            Assert(!saved.ValidateSession(token, identity), "disabling account revokes active access");
+            saved.SetApproval(@"SBHCS\joalvarez", true);
+            Assert(saved.Evaluate(identity).DisplayName == "Joshua Alvarez", "re-approval retains registered name");
+            var rejected = false;
+            try { saved.SetApproval("joshua.alvarez@rwjbh.org", true); } catch (InvalidOperationException) { rejected = true; }
+            Assert(rejected, "account manager rejects email approvals");
+            saved.SetApproval(@"LOCAL-PC\Joshua Alvarez", true);
+            Assert(saved.Evaluate(identity with { DomainName = "LOCAL-PC", UserName = "Joshua Alvarez" }).IsApproved, "explicit local Windows usernames may contain spaces");
+            Assert(!JsonSerializer.Serialize(identity).Contains("DisplayName"), "absent profile does not change legacy evidence serialization");
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     public static void PortLedgerRows()
@@ -110,7 +128,7 @@ internal static class Tests
             var latest = store.List().First();
             Assert(latest.ChangedSincePrevious, "latest row highlighted");
             Assert(latest.Changes.Any(c => c.Field == "Native VLAN" && c.Previous == "20" && c.Current == "30"), "vlan change");
-            Assert(latest.Changes.Any(c => c.Field == "Management IP" && c.Previous == "10.10.20.2" && c.Current == "10.10.30.2"), "ip change");
+            Assert(latest.Changes.Any(c => c.Field == "Switch IP" && c.Previous == "10.10.20.2" && c.Current == "10.10.30.2"), "ip change");
         }
         finally
         {
@@ -136,6 +154,59 @@ internal static class Tests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    public static void MergePortSources()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var lldp = Observation("LLDP", "NB-TEST", "00:11:22:33:44:55", "Gi1/0/13", 20, "10.0.0.1", now);
+        lldp = lldp with { Latest = lldp.Latest with { VoiceVlan = null, Duplex = null } };
+        var cdp = Observation("CDP", "NB-TEST", "NB-TEST", "GigabitEthernet1/0/13", 20, null, now.AddSeconds(1));
+        cdp = cdp with { Latest = cdp.Latest with { VoiceVlan = 50, Duplex = "Full", NativeVlan = null } };
+        var record = Evidence("combined", now, [lldp, cdp]);
+        var merged = PortSnapshots.FromScan(record.Scan).Single();
+        Assert(merged.NativeVlan == 20 && merged.VoiceVlan == 50 && merged.Duplex == "Full", "complementary values are retained");
+        Assert(merged.SwitchIp == "10.0.0.1" && merged.SwitchMac == "00:11:22:33:44:55", "switch IP and advertised chassis MAC retained");
+        Assert(merged.Conflicts.Count == 0, "port abbreviations and missing values are not conflicts");
+        Assert(PortLedgerStore.BuildEntries(record).Count == 1, "one immutable row for the combined port");
+        var differentPort = cdp with { Latest = cdp.Latest with { PortId = "Gi1/0/14" } };
+        Assert(PortSnapshots.FromScan(record.Scan with { Observations = [lldp, differentPort] }).Count == 2, "different ports stay separate");
+        var differentSwitch = lldp with { Latest = lldp.Latest with { ChassisId = "00:11:22:33:44:66" } };
+        Assert(PortSnapshots.FromScan(record.Scan with { Observations = [lldp, differentSwitch] }).Count == 2, "different chassis MACs stay separate");
+        var conflict = cdp with { Latest = cdp.Latest with { NativeVlan = 30 } };
+        var conflicted = PortSnapshots.FromScan(record.Scan with { Observations = [lldp, conflict] }).Single();
+        Assert(conflicted.NativeVlan == 30 && conflicted.Conflicts.Any(c => c.Contains("Native VLAN")), "conflicts are surfaced with latest value");
+        Assert(PortSnapshots.FromScan(record.Scan with { Observations = [lldp] }).Single().VoiceVlan is null, "previous protocol values are not invented in a later capture");
+        Assert(PortSnapshots.Mac("NB-TEST") is null, "hostname is never labeled as a MAC");
+        var numeric = lldp with { Latest = lldp.Latest with { PortId = "13", PortDescription = "GigabitEthernet1/0/13" } };
+        Assert(PortSnapshots.FromScan(record.Scan with { Observations = [numeric, cdp] }).Count == 1, "explicit interface description matches a numeric port ID");
+    }
+
+    public static void PortHistoryLookup()
+    {
+        var root = TempRoot();
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var archive = Path.Combine(root, "nas");
+            var settings = TestSettings(Path.Combine(root, "local"), archive);
+            var local = new PortLedgerStore(() => settings);
+            local.Save(Evidence("previous", now.AddDays(-30), [Observation("LLDP", "NB-TEST", "00:11:22:33:44:55", "Gi1/0/13", 20, "10.0.0.1", now)]));
+            local.Save(Evidence("current", now, [Observation("CDP", "NB-TEST", "NB-TEST", "GigabitEthernet1/0/13", 30, "10.0.0.2", now)]));
+            local.Save(Evidence("other-port", now.AddDays(-1), [Observation("LLDP", "NB-TEST", "00:11:22:33:44:55", "Gi1/0/14", 10, null, now)]));
+            var history = local.History("NB-TEST", null, "g1/0/13", "current", now);
+            Assert(history.Entries.Count == 1 && history.Entries[0].EvidenceId == "previous", "same port, previous dates only, mirrored copies deduplicated");
+            Assert(local.History("NB-TEST", "00:11:22:33:44:66", "Gi1/0/13", "current", now).Entries.Count == 1, "same named switch-port history survives chassis replacement for MAC comparison");
+            var secondSettings = TestSettings(Path.Combine(root, "second-pc"), archive);
+            var second = new PortLedgerStore(() => secondSettings);
+            Assert(second.History("NB-TEST", null, "Gi1/0/13", "current", now).Entries.Count == 1, "another workstation can read the shared NAS timeline");
+            Assert(local.History(null, null, "Gi1/0/13", null, null).Entries.Count == 0, "incomplete identity cannot match real history");
+            Assert(local.History("NB-OTHER", null, "Gi1/0/13", null, null).Entries.Count == 0, "same port on another switch does not match");
+            var missingSettings = settings with { ArchiveMirrorPath = Path.Combine(root, "unavailable") };
+            var missing = new PortLedgerStore(() => missingSettings).History("NB-TEST", null, "Gi1/0/13", "current", now);
+            Assert(missing.Entries.Count == 1 && missing.Warning is not null, "unavailable archive retains local history and reports limitation");
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     public static void NeighborConflicts()

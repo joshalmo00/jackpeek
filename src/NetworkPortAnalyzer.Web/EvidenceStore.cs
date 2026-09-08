@@ -130,7 +130,7 @@ public sealed class EvidenceStore
         return next;
     }
 
-    public EvidenceSaveResult SaveScan(ScanResult scan)
+    public EvidenceSaveResult SaveScan(ScanResult scan, WorkstationIdentity? scanner = null)
     {
         var settings = GetSettings();
         if (!settings.StorageMode.Equals(StorageNasOnlyWithCache, StringComparison.OrdinalIgnoreCase))
@@ -142,7 +142,9 @@ public sealed class EvidenceStore
         ApplyRetention(settings);
 
         var createdAt = DateTimeOffset.Now;
-        var workstation = _identity.Capture(settings.IncludeWindowsUser);
+        var workstation = scanner ?? _identity.Capture(settings.IncludeWindowsUser);
+        if (!settings.IncludeWindowsUser)
+            workstation = workstation with { UserName = null, DomainName = null, UserSid = null, DisplayName = null };
         var evidenceId = BuildEvidenceId(workstation.MachineName, scan.AdapterId);
         var result = scan with { ScanId = evidenceId };
         var unsigned = new EvidenceRecord(evidenceId, createdAt, workstation, settings, result, string.Empty);
@@ -363,7 +365,7 @@ public sealed class EvidenceStore
     <div class="box"><span>Storage mode</span><strong>{{Html(record.Settings.StorageMode)}}</strong></div>
     <div class="box"><span>Created</span><strong>{{Html(record.CreatedAt.ToString("u"))}}</strong></div>
     <div class="box"><span>Workstation</span><strong>{{Html(record.Workstation.MachineName)}}</strong></div>
-    <div class="box"><span>Windows user</span><strong>{{Html(record.Workstation.UserName ?? "Not recorded")}}</strong></div>
+    <div class="box"><span>Scanned by</span><strong>{{Html(record.Workstation.DisplayName ?? record.Workstation.UserName ?? "Not recorded")}}</strong></div>
     <div class="box"><span>Domain</span><strong>{{Html(record.Workstation.DomainName ?? "Not recorded")}}</strong></div>
     <div class="box"><span>Adapter</span><strong>{{Html(record.Scan.AdapterId)}}</strong></div>
     <div class="box"><span>Frames captured</span><strong>{{Html(record.Scan.FramesCaptured.ToString())}}</strong></div>
@@ -464,7 +466,8 @@ public sealed class EvidenceStore
             priorReview?.Record.EvidenceId,
             priorReview?.Score ?? 0,
             priorReview is not null && (!priorReview.ContinueHistory || priorReview.Score < 3),
-            priorReview?.Reason);
+            priorReview?.Reason,
+            record.Workstation.DisplayName);
     }
 
     private string? TryMirrorToNas(EvidenceRecord record, EvidenceSettings settings, SwitchReviewMatch? priorReview, out string? error)

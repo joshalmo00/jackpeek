@@ -1,6 +1,6 @@
 // Run against a locally running JackPeek instance. Mutating APIs are mocked.
 // Requires Playwright on NODE_PATH or installed in the development environment.
-const { chromium } = require("playwright");
+const { chromium } = require("playwright-core");
 const AxeBuilder = require("@axe-core/playwright").default;
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -62,10 +62,7 @@ fs.mkdirSync(output, { recursive: true });
         ),
       );
       await page.goto(base);
-      await page.waitForFunction(
-        () =>
-          !document.querySelector("#status").textContent.includes("Loading"),
-      );
+      await page.locator("#signInScreen").waitFor();
       await page.screenshot({
         path: path.join(output, "capture-actual-desktop.png"),
         fullPage: true,
@@ -163,7 +160,7 @@ fs.mkdirSync(output, { recursive: true });
         changes: [
           { field: "Native VLAN", previous: "10", current: "20" },
           {
-            field: "Management IP",
+            field: "Switch IP",
             previous: "192.0.2.9",
             current: "192.0.2.10",
           },
@@ -209,13 +206,47 @@ fs.mkdirSync(output, { recursive: true });
         body = {
           settings,
           license,
+          admin: { isConfigured: true, isUnlocked: true },
+          access: {
+            isApproved: true,
+            account: "TEST\\\\user",
+            requiresProfile: false,
+          },
           workstation: {
             machineName: "TEST-WORKSTATION",
             userName: settings.includeWindowsUser ? "Test user" : null,
           },
         };
+      else if (url.pathname === "/api/access/login")
+        body = { isApproved: true, requiresProfile: false };
+      else if (url.pathname === "/api/admin/accounts") body = [];
       else if (url.pathname === "/api/reports") body = reports;
       else if (url.pathname === "/api/ports/log") body = portLog;
+      else if (url.pathname === "/api/ports/history")
+        body = {
+          entries: [
+            {
+              evidenceId: "previous-capture",
+              scannedAt: "2026-08-01T12:00:00Z",
+              scannedBy: "Joshua Alvarez",
+              workstation: "FIELD-LAPTOP",
+              port: {
+                switchName: packet.deviceName,
+                chassisId: packet.chassisId,
+                switchMac: packet.chassisId,
+                port: "GigabitEthernet1/0/24",
+                switchIp: "192.0.2.9",
+                nativeVlan: 10,
+                voiceVlan: null,
+                duplex: packet.duplex,
+                capabilities: packet.capabilities,
+                protocols: ["LLDP"],
+                conflicts: [],
+              },
+            },
+          ],
+          warning: null,
+        };
       else if (url.pathname.endsWith("/verify")) body = { valid: true };
       else if (url.pathname === "/api/reports/fixture1") body = report;
       else if (url.pathname === "/api/evidence/settings") {
@@ -236,7 +267,29 @@ fs.mkdirSync(output, { recursive: true });
         body =
           runningPolls-- > 0
             ? { state: "running" }
-            : { state: "complete", result: scan, evidence: report };
+            : {
+                state: "complete",
+                result: scan,
+                evidence: report,
+                ports: [
+                  {
+                    switchName: packet.deviceName,
+                    chassisId: packet.chassisId,
+                    switchMac: packet.chassisId,
+                    port: packet.portId,
+                    portDescription: packet.portDescription,
+                    switchIp: packet.managementAddress,
+                    nativeVlan: packet.nativeVlan,
+                    voiceVlan: packet.voiceVlan,
+                    duplex: packet.duplex,
+                    capabilities: packet.capabilities,
+                    protocols: ["LLDP"],
+                    conflicts: [
+                      "Native VLAN: 10 / 20. Showing the most recently observed value.",
+                    ],
+                  },
+                ],
+              };
       } else throw new Error(`Unmocked API request: ${url.pathname}`);
       await route.fulfill({
         status,
@@ -244,10 +297,20 @@ fs.mkdirSync(output, { recursive: true });
         body: JSON.stringify(body),
       });
     });
+    async function openFixture(route = "/#capture") {
+      await page.goto(base + route);
+      if (route.startsWith("/#")) {
+        if (await page.locator("#signInScreen").isVisible())
+          await page.locator("#windowsSignInBtn").click();
+        await page.locator(".topbar").waitFor();
+        await page.locator('[data-tab="' + route.slice(2) + '"]').click();
+        if (route === "/#settings") await page.locator("#general-tab").click();
+      }
+    }
     await check(
       "no adapter state, accessible tabs and history empty state",
       async () => {
-        await page.goto(base);
+        await openFixture();
         await expectText("#status", "No wired Ethernet");
         assert(await page.locator("#scanBtn").isDisabled());
         await page.getByRole("tab", { name: "Capture", exact: true }).focus();
@@ -324,11 +387,53 @@ fs.mkdirSync(output, { recursive: true });
         assert(await page.locator("#scanBtn").isEnabled());
         assert(await page.locator("#adapterSelect").isEnabled());
         await expectText("#results", "Gi1/0/24");
-        await expectText("#results", "Conflicting advertisements");
-        await page.locator("#results summary").click();
-        await expectText("#results pre", "<img src=x onerror=alert(1)>");
-        assert.equal(await page.locator("#results pre img").count(), 0);
-        await page.locator("#results summary").click();
+        await expectText("#results", "Conflicting advertised values");
+        assert.equal(
+          await page.locator("#results pre, #results details").count(),
+          0,
+        );
+        assert(!/LLDP|CDP/.test(await page.locator("#results").innerText()));
+        await expectText("#results", "Switch MAC address");
+        await expectText("#results", "Switch IP");
+        await page.locator('[data-port-history="0"]').click();
+        await expectText(".comparison-status", "2 changed fields");
+        assert.equal(
+          await page
+            .locator(".port-comparison.is-comparing .port-card")
+            .count(),
+          2,
+        );
+        assert.equal(
+          await page.locator(".value-changed").count(),
+          4,
+          "both versions of two changed fields are marked",
+        );
+        await expectText("#results", "Joshua Alvarez");
+        await expectText("#results", "Not observed");
+        await page.screenshot({
+          path: path.join(output, "port-comparison-desktop.png"),
+          fullPage: true,
+        });
+        const comparisonAudit = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+          .analyze();
+        assert.deepEqual(
+          comparisonAudit.violations.map((v) => v.id),
+          [],
+        );
+        await page.setViewportSize({ width: 390, height: 844 });
+        assert(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+        await page.screenshot({
+          path: path.join(output, "port-comparison-mobile.png"),
+          fullPage: true,
+        });
+        await page.setViewportSize({ width: 1440, height: 1000 });
+        await page.locator("#closeComparisonBtn").click();
+        assert.equal(await page.locator(".is-comparing").count(), 0);
         await page.screenshot({
           path: path.join(output, "capture-results-fixture-desktop.png"),
           fullPage: true,
@@ -381,7 +486,10 @@ fs.mkdirSync(output, { recursive: true });
     );
     await check("settings save and policy lock remain consistent", async () => {
       await page.getByRole("tab", { name: "Settings", exact: true }).click();
+      await page.locator("#general-tab").click();
+      await page.locator('[data-setting-section="1"]').click();
       await page.locator("#includeUserInput").uncheck();
+      await page.locator('[data-setting-section="2"]').click();
       await page.locator("#maxCaptureDurationInput").fill("15");
       await page.locator("#saveSettingsBtn").click();
       await expectText("#settingsStatus", "Settings saved");
@@ -422,7 +530,7 @@ fs.mkdirSync(output, { recursive: true });
         "/privacy",
         "/terms",
       ]) {
-        await page.goto(base + route);
+        await openFixture(route);
         await page.locator("h1:visible").waitFor();
         assert(
           await page.evaluate(
@@ -449,6 +557,8 @@ fs.mkdirSync(output, { recursive: true });
         });
       }
       await page.getByRole("link", { name: "Back to JackPeek" }).click();
+      await page.locator("#windowsSignInBtn").click();
+      await page.locator('[data-tab="settings"]').click();
       await page
         .getByRole("heading", { name: "Settings", exact: true })
         .waitFor();
@@ -465,7 +575,7 @@ fs.mkdirSync(output, { recursive: true });
           "/privacy",
           "/terms",
         ]) {
-          await page.goto(base + route);
+          await openFixture(route);
           await page.locator("h1:visible").waitFor();
           const audit = await new AxeBuilder({ page })
             .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

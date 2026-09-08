@@ -74,7 +74,10 @@ public sealed class AdminService
         var hash = HashPassword(newPassword, salt);
         var state = new AdminPasswordState(Convert.ToBase64String(salt), Convert.ToBase64String(hash));
         File.WriteAllText(_adminPath, JsonSerializer.Serialize(state, JsonOptions));
+        _sessions.Clear();
     }
+
+    public void Lock(string? token) { if (token is not null) _sessions.TryRemove(token, out _); }
 
     private bool IsConfigured() => File.Exists(_adminPath);
 
