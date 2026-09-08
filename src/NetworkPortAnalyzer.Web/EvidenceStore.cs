@@ -130,7 +130,7 @@ public sealed class EvidenceStore
         return next;
     }
 
-    public EvidenceSummary SaveScan(ScanResult scan)
+    public EvidenceSaveResult SaveScan(ScanResult scan)
     {
         var settings = GetSettings();
         if (!settings.StorageMode.Equals(StorageNasOnlyWithCache, StringComparison.OrdinalIgnoreCase))
@@ -158,10 +158,10 @@ public sealed class EvidenceStore
             if (mirrorPath is not null)
             {
                 TryDelete(cachePath);
-                return ToSummary(record, null, mirrorPath, "nas-synced", null, priorReview);
+                return new EvidenceSaveResult(ToSummary(record, null, mirrorPath, "nas-synced", null, priorReview), record);
             }
 
-            return ToSummary(record, cachePath, null, "pending-nas-sync", record.CreatedAt.AddHours(settings.CacheExpirationHours), priorReview);
+            return new EvidenceSaveResult(ToSummary(record, cachePath, null, "pending-nas-sync", record.CreatedAt.AddHours(settings.CacheExpirationHours), priorReview), record);
         }
 
         var localEncrypted = settings.RequireEvidenceEncryption;
@@ -176,7 +176,7 @@ public sealed class EvidenceStore
             archivePath = TryMirrorToNas(record, settings, archivePriorReview, out _);
         }
 
-        return ToSummary(record, localPath, archivePath, archivePath is null ? "local-saved" : "local-and-nas-synced", null, archivePriorReview);
+        return new EvidenceSaveResult(ToSummary(record, localPath, archivePath, archivePath is null ? "local-saved" : "local-and-nas-synced", null, archivePriorReview), record);
     }
 
     public IReadOnlyList<EvidenceSummary> ListReports()
@@ -930,6 +930,8 @@ public sealed record EvidenceSettingsUpdate(
     int? NasSyncIntervalMinutes,
     bool? AdminManagedCacheEncryption);
 
-file sealed record SwitchIdentityParts(string? Name, string? ManagementIp, string? ChassisId, string? Port);
+sealed record SwitchIdentityParts(string? Name, string? ManagementIp, string? ChassisId, string? Port);
 
-file sealed record SwitchReviewMatch(EvidenceRecord Record, int Score, bool ContinueHistory, string Reason);
+sealed record SwitchReviewMatch(EvidenceRecord Record, int Score, bool ContinueHistory, string Reason);
+
+public sealed record EvidenceSaveResult(EvidenceSummary Summary, EvidenceRecord Record);

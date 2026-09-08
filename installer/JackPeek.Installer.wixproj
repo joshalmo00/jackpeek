@@ -3,6 +3,8 @@
     <OutputName>JackPeek</OutputName>
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
-    <DefineConstants>PublishDir=$(MSBuildThisFileDirectory)..\output\v1.0\</DefineConstants>
+    <PublishDir Condition="'$(PublishDir)' == ''">$(MSBuildThisFileDirectory)..\output\v1.0\</PublishDir>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <DefineConstants>PublishDir=$(PublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
 </Project>

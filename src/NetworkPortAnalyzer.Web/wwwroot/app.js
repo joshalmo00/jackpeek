@@ -1,523 +1,1162 @@
-const adapterSelect = document.querySelector("#adapterSelect");
-const durationInput = document.querySelector("#durationInput");
-const scanBtn = document.querySelector("#scanBtn");
-const refreshBtn = document.querySelector("#refreshBtn");
-const statusEl = document.querySelector("#status");
-const resultsEl = document.querySelector("#results");
-const adapterName = document.querySelector("#adapterName");
-const adapterDescription = document.querySelector("#adapterDescription");
-const adapterLink = document.querySelector("#adapterLink");
-const adapterMac = document.querySelector("#adapterMac");
-const adapterIps = document.querySelector("#adapterIps");
-const captureState = document.querySelector("#captureState");
-const progressBar = document.querySelector("#progressBar");
-const storageModeInput = document.querySelector("#storageModeInput");
-const secureModeInput = document.querySelector("#secureModeInput");
-const includeUserInput = document.querySelector("#includeUserInput");
-const localHistoryInput = document.querySelector("#localHistoryInput");
-const archiveMirrorInput = document.querySelector("#archiveMirrorInput");
-const localCacheInput = document.querySelector("#localCacheInput");
-const cacheExpirationHoursInput = document.querySelector("#cacheExpirationHoursInput");
-const nasSyncIntervalInput = document.querySelector("#nasSyncIntervalInput");
-const cacheWarningHoursInput = document.querySelector("#cacheWarningHoursInput");
-const maxCaptureDurationInput = document.querySelector("#maxCaptureDurationInput");
-const allowSettingsEditInput = document.querySelector("#allowSettingsEditInput");
-const requireValidLicenseInput = document.querySelector("#requireValidLicenseInput");
-const requireEvidenceEncryptionInput = document.querySelector("#requireEvidenceEncryptionInput");
-const evidenceRetentionDaysInput = document.querySelector("#evidenceRetentionDaysInput");
-const allowEvidenceDeletionInput = document.querySelector("#allowEvidenceDeletionInput");
-const allowNasMirrorInput = document.querySelector("#allowNasMirrorInput");
-const adminManagedCacheEncryptionInput = document.querySelector("#adminManagedCacheEncryptionInput");
-const saveSettingsBtn = document.querySelector("#saveSettingsBtn");
-const settingsStatus = document.querySelector("#settingsStatus");
-const refreshReportsBtn = document.querySelector("#refreshReportsBtn");
-const syncCacheBtn = document.querySelector("#syncCacheBtn");
-const reportsEl = document.querySelector("#reports");
-const cacheWarnings = document.querySelector("#cacheWarnings");
-const sessionUser = document.querySelector("#sessionUser");
-const sessionMachine = document.querySelector("#sessionMachine");
-const lastEvidence = document.querySelector("#lastEvidence");
-const tabButtons = document.querySelectorAll("[data-tab-target]");
-const tabPanels = document.querySelectorAll(".tab-panel");
-const licenseFileInput = document.querySelector("#licenseFileInput");
-const licenseStatus = document.querySelector("#licenseStatus");
-const licenseDetail = document.querySelector("#licenseDetail");
-const licenseImportStatus = document.querySelector("#licenseImportStatus");
-const brandLogo = document.querySelector("#brandLogo");
-const adminModal = document.querySelector("#adminModal");
-const closeAdminBtn = document.querySelector("#closeAdminBtn");
-const unlockAdminBtn = document.querySelector("#unlockAdminBtn");
-const adminPasswordInput = document.querySelector("#adminPasswordInput");
-const adminStatus = document.querySelector("#adminStatus");
-const adminPanel = document.querySelector("#adminPanel");
-const currentAdminPasswordInput = document.querySelector("#currentAdminPasswordInput");
-const newAdminPasswordInput = document.querySelector("#newAdminPasswordInput");
-const saveAdminPasswordBtn = document.querySelector("#saveAdminPasswordBtn");
+"use strict";
 
-let adapters = [];
-let countdownTimer = null;
-let adminClicks = [];
-let adminToken = null;
+const $ = (id) => document.getElementById(id);
+const state = {
+  adapters: [],
+  settings: null,
+  license: null,
+  reports: [],
+  portLog: [],
+  result: null,
+  selectedReport: null,
+  activeScan: null,
+  busy: false,
+  adapterLoading: false,
+  settingsBusy: false,
+  polling: false,
+  npcapPromptShown: false,
+  timer: null,
+  reportRequest: 0,
+  workstation: null,
+  admin: { isConfigured: false, isUnlocked: false },
+  adminToken: "",
+  pendingCache: [],
+  activeAdminTab: "staff",
+  logoClicks: 0,
+  logoClickTimer: null,
+  access: { isApproved: true, approvedUsers: [], accessContacts: [] },
+};
+const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
+const emptySymbol =
+  '<div class="empty-symbol" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="12" width="34" height="24" rx="3"/><path d="M13 22h4v6h-4zm9 0h4v6h-4zm9 0h4v6h-4M14 17h20"/></svg></div>';
+const escapeHtml = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const formatDate = (value) =>
+  value && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toLocaleString()
+    : "Not recorded";
+const plural = (value, noun) => `${value} ${noun}${value === 1 ? "" : "s"}`;
+const empty = (title, detail) =>
+  `<div class="empty-state">${emptySymbol}<h3>${escapeHtml(title)}</h3><p>${escapeHtml(detail)}</p></div>`;
+const selectedAdapter = () =>
+  state.adapters.find((a) => a.id === $("adapterSelect").value);
 
-refreshBtn.addEventListener("click", loadAdapters);
-scanBtn.addEventListener("click", startScan);
-adapterSelect.addEventListener("change", updateSelectedAdapter);
-saveSettingsBtn.addEventListener("click", saveSettings);
-refreshReportsBtn.addEventListener("click", loadReports);
-syncCacheBtn.addEventListener("click", syncCache);
-licenseFileInput.addEventListener("change", importLicense);
-tabButtons.forEach(button => button.addEventListener("click", () => showTab(button.dataset.tabTarget)));
-brandLogo.addEventListener("click", handleAdminGesture);
-closeAdminBtn.addEventListener("click", closeAdminModal);
-unlockAdminBtn.addEventListener("click", unlockAdmin);
-saveAdminPasswordBtn.addEventListener("click", saveAdminPassword);
+async function request(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new Error(
+      "The local service could not be reached. Keep JackPeek running and try again.",
+    );
+  }
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    /* Report invalid responses below. */
+  }
+  if (!response.ok)
+    throw new Error(
+      body?.error ||
+        (response.status === 402
+          ? "Capture is blocked by the offline license policy. Import a valid license in Settings."
+          : `The request failed (HTTP ${response.status}). Try again.`),
+    );
+  if (text && body === null)
+    throw new Error("The local service returned an unreadable response.");
+  return body;
+}
+const adminHeaders = () =>
+  state.adminToken ? { "x-jackpeek-admin": state.adminToken } : {};
+const post = (path, value, headers = {}) =>
+  request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(value),
+  });
+function badge(id, label, tone = "") {
+  $(id).textContent = label;
+  $(id).className = `badge ${tone}`;
+}
+function notice(message = "", tone = "warning") {
+  $("captureNotice").textContent = message;
+  $("captureNotice").className = `notice ${tone}`;
+  $("captureNotice").hidden = !message;
+}
+
+function shouldShowNpcapDialog() {
+  return (
+    !state.npcapPromptShown &&
+    state.adapters.length > 0 &&
+    state.adapters.every((adapter) => !adapter.captureAvailable)
+  );
+}
+
+function showNpcapDialog() {
+  if (!shouldShowNpcapDialog()) return;
+  state.npcapPromptShown = true;
+  $("npcapDialog").hidden = false;
+  $("npcapDownloadLink").focus();
+}
+
+function hideNpcapDialog() {
+  $("npcapDialog").hidden = true;
+}
+
+function showAdminLoginPage() {
+  showTab("settings");
+  if (!state.admin?.isConfigured) {
+    showAdminTab("access");
+    $("newAdminPasswordInput").focus();
+    $("adminPasswordStatus").textContent =
+      "Create the administrator password before using the hidden login shortcut.";
+    return;
+  }
+  $("adminLoginDialog").hidden = false;
+  document.body.classList.add("admin-login-open");
+  $("adminPortalPasswordInput").value = "";
+  $("adminPortalStatus").textContent =
+    "Enter the administrator password to continue.";
+  $("adminPortalPasswordInput").focus();
+}
+
+function hideAdminLoginPage() {
+  $("adminLoginDialog").hidden = true;
+  document.body.classList.remove("admin-login-open");
+}
+
+function renderAccessGate() {
+  const access = state.access || { isApproved: true };
+  const denied = access.isApproved === false;
+  $("accessDeniedScreen").hidden = !denied;
+  document.body.classList.toggle("access-denied", denied);
+  if (!denied) return;
+  document.title = "Access denied | JackPeek";
+  $("accessDeniedReason").textContent =
+    access.message ||
+    "This Windows account is not approved to use JackPeek on this workstation.";
+  $("accessDeniedAccount").textContent = access.account
+    ? `Detected account: ${access.account}`
+    : "Detected account could not be normalized.";
+}
+
+function showTab(name, updateUrl = true) {
+  if (!tabs.some((tab) => tab.dataset.tab === name)) name = "capture";
+  tabs.forEach((tab) => {
+    const active = tab.dataset.tab === name;
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    $(tab.dataset.tab).hidden = !active;
+  });
+  const titles = {
+    capture: "Capture",
+    history: "Evidence history",
+    ports: "Port log",
+    settings: "Settings",
+  };
+  document.title = `${titles[name] || "Capture"} | JackPeek`;
+  if (updateUrl && location.hash !== `#${name}`)
+    history.pushState(null, "", `#${name}`);
+}
+tabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => showTab(tab.dataset.tab));
+  tab.addEventListener("keydown", (event) => {
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % tabs.length
+        : event.key === "ArrowLeft"
+          ? (index + tabs.length - 1) % tabs.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : null;
+    if (next !== null) {
+      event.preventDefault();
+      tabs[next].focus();
+      showTab(tabs[next].dataset.tab);
+    }
+  });
+});
+window.addEventListener("popstate", () =>
+  showTab(location.hash.slice(1), false),
+);
+window.addEventListener("hashchange", () =>
+  showTab(location.hash.slice(1), false),
+);
+
+function updateControls() {
+  const adapter = selectedAdapter();
+  const blocked =
+    state.settings?.requireValidLicense && !state.license?.isValid;
+  $("scanBtn").disabled =
+    state.busy ||
+    state.adapterLoading ||
+    state.settingsBusy ||
+    !state.settings ||
+    !adapter?.captureAvailable ||
+    adapter.operationalStatus !== "Up" ||
+    Boolean(blocked);
+  $("scanBtn").querySelector("span").textContent = state.busy
+    ? "Capture in progress"
+    : "Start capture";
+  $("adapterSelect").disabled =
+    state.busy || state.adapterLoading || !state.adapters.length;
+  $("durationInput").disabled = state.busy;
+  $("refreshBtn").disabled = state.busy || state.adapterLoading;
+}
+
+function updateAdapter() {
+  const adapter = selectedAdapter();
+  $("adapterName").textContent = adapter?.name || "No wired Ethernet adapter";
+  $("adapterDescription").textContent =
+    adapter?.description ||
+    "Connect a physical Ethernet adapter, then refresh.";
+  $("adapterMac").textContent = adapter?.macAddress || "Not available";
+  $("adapterIps").textContent = adapter?.ipAddresses?.length
+    ? adapter.ipAddresses.join(" · ")
+    : "Not assigned";
+  const up = adapter?.operationalStatus === "Up";
+  badge(
+    "adapterLink",
+    adapter
+      ? up
+        ? "Connected"
+        : adapter.operationalStatus === "Down"
+          ? "Disconnected"
+          : adapter.operationalStatus
+      : "Unavailable",
+    adapter ? (up ? "success" : "warning") : "",
+  );
+  badge(
+    "captureState",
+    adapter
+      ? adapter.captureAvailable
+        ? "Npcap ready"
+        : "Npcap not ready"
+      : "No adapter",
+    adapter ? (adapter.captureAvailable ? "success" : "warning") : "",
+  );
+  if (!state.busy) {
+    if (!adapter) {
+      $("status").textContent = "No wired Ethernet adapter detected.";
+      notice();
+    } else if (!up) {
+      $("status").textContent =
+        "Connect an Ethernet cable, then refresh adapters.";
+      notice(
+        "The selected adapter has no active link. Connect it to a switch before capturing.",
+      );
+    } else if (!adapter.captureAvailable) {
+      $("status").textContent =
+        "No capture device is available for this adapter.";
+      notice(
+        "Check that Npcap is installed and accessible, then refresh adapters. JackPeek does not install capture drivers.",
+      );
+      const link = document.createElement("a");
+      link.href = "https://npcap.com/#download";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent =
+        " Npcap download and documentation (opens in a new tab)";
+      $("captureNotice").append(link);
+    } else if (state.settings?.requireValidLicense && !state.license?.isValid) {
+      $("status").textContent = "Capture is blocked by license policy.";
+      notice(
+        "Import a valid offline license in Settings before starting a capture.",
+      );
+    } else {
+      $("status").textContent =
+        "Ready to listen for LLDP and CDP advertisements.";
+      notice();
+    }
+  }
+  if (!state.result && !state.busy) {
+    $("results").innerHTML = !adapter
+      ? empty(
+          "No wired Ethernet adapter detected",
+          "Connect a physical Ethernet adapter and refresh the adapter list to begin.",
+        )
+      : !up
+        ? empty(
+            "Connect Ethernet to begin",
+            "The selected adapter has no active link. Connect a cable to the switch, then refresh adapters.",
+          )
+        : !adapter.captureAvailable
+          ? empty(
+              "Capture support is unavailable",
+              "Check the Npcap installation and access permissions, then refresh adapters.",
+            )
+          : state.settings?.requireValidLicense && !state.license?.isValid
+            ? empty(
+                "A valid license is required",
+                "Import an offline license in Settings to enable capture on this workstation.",
+              )
+            : empty(
+                "Ready to capture",
+                "Select a duration and start listening. Only information advertised by the connected switch will appear here.",
+              );
+  }
+  updateControls();
+}
 
 async function loadAdapters() {
-  statusEl.textContent = "Loading Ethernet adapters...";
-  adapterSelect.innerHTML = "";
-  adapters = [];
-  const response = await fetch("/api/adapters");
-  adapters = await response.json();
-  for (const adapter of adapters) {
-    const option = document.createElement("option");
-    option.value = adapter.id;
-    option.textContent = `${adapter.name} - ${adapter.description}`;
-    adapterSelect.append(option);
-  }
-  scanBtn.disabled = adapters.length === 0;
-  updateSelectedAdapter();
-  resultsEl.innerHTML = adapters.length
-    ? `<div class="empty">Ready for a passive LLDP/CDP capture on wired Ethernet.</div>`
-    : `<div class="empty strong">No wired Ethernet adapter detected. Connect a physical Ethernet adapter and refresh.</div>`;
-  statusEl.textContent = adapters.length ? `${adapters.length} wired Ethernet adapter${adapters.length === 1 ? "" : "s"} available.` : "No wired Ethernet adapter detected.";
-}
-
-async function loadSession() {
-  const response = await fetch("/api/session");
-  const session = await response.json();
-  const workstation = session.workstation || {};
-  sessionUser.textContent = workstation.userName || "User not recorded";
-  sessionMachine.textContent = `${workstation.machineName || "Unknown PC"}${workstation.domainName ? ` - ${workstation.domainName}` : ""}`;
-  renderCacheWarnings(session.pendingCache || []);
-}
-
-function updateSelectedAdapter() {
-  const adapter = adapters.find(a => a.id === adapterSelect.value);
-  adapterName.textContent = adapter?.name || "No wired Ethernet adapter";
-  adapterDescription.textContent = adapter?.description || "Connect a physical Ethernet adapter and refresh";
-  adapterLink.textContent = adapter?.operationalStatus || "Unavailable";
-  adapterMac.textContent = adapter?.macAddress || "Not advertised";
-  adapterIps.textContent = adapter?.ipAddresses?.length ? adapter.ipAddresses.join(", ") : "Not assigned";
-  captureState.textContent = adapter ? (adapter.captureAvailable ? "Npcap ready" : "Npcap needed") : "Unavailable";
-}
-
-async function startScan() {
-  const adapterId = adapterSelect.value;
-  if (!adapterId) return;
-  scanBtn.disabled = true;
-  resultsEl.innerHTML = "";
-  lastEvidence.textContent = "Capture running";
-  const seconds = Number(durationInput.value || 30);
-  startCountdown(seconds);
-
-  const create = await fetch("/api/scans", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ adapterId, durationSeconds: seconds })
-  });
-  if (!create.ok) {
-    scanBtn.disabled = false;
-    clearInterval(countdownTimer);
-    const error = await readError(create, "Capture could not be started.");
-    statusEl.textContent = error;
-    return;
-  }
-  const { scanId } = await create.json();
-  await pollScan(scanId);
-}
-
-async function pollScan(scanId) {
-  const response = await fetch(`/api/scans/${scanId}`);
-  const scan = await response.json();
-  if (scan.state !== "complete") {
-    setTimeout(() => pollScan(scanId), 1000);
-    return;
-  }
-
-  scanBtn.disabled = false;
-  clearInterval(countdownTimer);
-  progressBar.style.width = "100%";
-  if (scan.error) {
-    statusEl.textContent = scan.error;
-  } else {
-    statusEl.textContent = `Captured ${scan.result.framesCaptured} discovery frames.`;
-  }
-  if (scan.evidence) {
-    lastEvidence.innerHTML = reportLinks(scan.evidence);
-    statusEl.innerHTML = `${escapeHtml(statusEl.textContent)} Evidence saved.`;
-  } else {
-    lastEvidence.textContent = "Not saved";
-  }
-  renderResults(scan.result);
-  await loadReports();
-  showTab("resultsTab");
-}
-
-function renderResults(result) {
-  if (!result || !result.observations.length) {
-    resultsEl.innerHTML = `<div class="empty strong">No LLDP or CDP advertisements were observed during this capture window.</div>`;
-    return;
-  }
-
-  resultsEl.innerHTML = result.observations.map(o => {
-    const p = o.latest;
-    return `<article class="observation">
-      <header class="neighbor-head">
-        <div>
-          <h2>${escapeHtml(p.deviceName || p.chassisId || "Advertised neighbor")}</h2>
-          <p>${escapeHtml(p.portId || "Port not advertised")}</p>
-        </div>
-        <span class="protocol">${escapeHtml(o.protocol)}</span>
-      </header>
-      <div class="neighbor-grid">
-        ${field("Chassis", p.chassisId, "wide")}
-        ${field("Switch port", p.portDescription || p.portId, "wide")}
-        ${field("Management IP", p.managementAddress)}
-        ${field("Native VLAN", p.nativeVlan, "badge")}
-        ${field("Voice VLAN", p.voiceVlan, "badge")}
-        ${field("Duplex", p.duplex)}
-        ${field("Capabilities", (p.capabilities || []).join(", "), "wide")}
-        ${field("Frames", o.framesSeen)}
-      </div>
-      ${o.conflicts.length ? `<div class="conflict">${escapeHtml(o.conflicts.join("; "))}</div>` : ""}
-      <details>
-        <summary>Verbose TLVs</summary>
-        <pre>${escapeHtml(JSON.stringify({ details: p.details, unknownTlvs: p.unknownTlvs }, null, 2))}</pre>
-      </details>
-    </article>`;
-  }).join("");
-}
-
-async function loadSettings() {
-  const response = await fetch("/api/evidence/settings");
-  const settings = await response.json();
-  storageModeInput.value = settings.storageMode || "local-nas-mirror";
-  secureModeInput.checked = Boolean(settings.secureMode);
-  includeUserInput.checked = Boolean(settings.includeWindowsUser);
-  localHistoryInput.value = settings.localHistoryPath || "";
-  archiveMirrorInput.value = settings.archiveMirrorPath || "";
-  localCacheInput.value = settings.localCachePath || "";
-  cacheExpirationHoursInput.value = settings.cacheExpirationHours || 24;
-  nasSyncIntervalInput.value = settings.nasSyncIntervalMinutes || 60;
-  cacheWarningHoursInput.value = (settings.cacheWarningHours || [3, 2]).join(",");
-  maxCaptureDurationInput.value = settings.maxCaptureDurationSeconds || 120;
-  durationInput.max = settings.maxCaptureDurationSeconds || 120;
-  if (Number(durationInput.value) > Number(durationInput.max)) durationInput.value = durationInput.max;
-  allowSettingsEditInput.checked = Boolean(settings.allowSettingsEdit);
-  requireValidLicenseInput.checked = Boolean(settings.requireValidLicense);
-  requireEvidenceEncryptionInput.checked = Boolean(settings.requireEvidenceEncryption);
-  evidenceRetentionDaysInput.value = settings.evidenceRetentionDays || 0;
-  allowEvidenceDeletionInput.checked = Boolean(settings.allowEvidenceDeletion);
-  allowNasMirrorInput.checked = settings.allowNasMirror !== false;
-  adminManagedCacheEncryptionInput.checked = settings.adminManagedCacheEncryption !== false;
-  [storageModeInput, secureModeInput, includeUserInput, localHistoryInput, archiveMirrorInput, localCacheInput, cacheExpirationHoursInput, nasSyncIntervalInput, cacheWarningHoursInput, maxCaptureDurationInput, allowSettingsEditInput, requireValidLicenseInput, requireEvidenceEncryptionInput, evidenceRetentionDaysInput, allowEvidenceDeletionInput, allowNasMirrorInput, adminManagedCacheEncryptionInput, saveSettingsBtn]
-    .forEach(control => control.disabled = !settings.allowSettingsEdit);
-  settingsStatus.textContent = storageModeLabel(settings.storageMode);
-}
-
-async function saveSettings() {
-  saveSettingsBtn.disabled = true;
-  settingsStatus.textContent = "Saving evidence settings...";
+  if (state.busy || state.adapterLoading) return;
+  const previous = $("adapterSelect").value;
+  state.adapterLoading = true;
+  updateControls();
+  $("status").textContent = "Refreshing Ethernet adapters...";
   try {
-    const response = await fetch("/api/evidence/settings", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-jackpeek-admin": adminToken || "" },
-      body: JSON.stringify({
-        storageMode: storageModeInput.value,
-        secureMode: secureModeInput.checked,
-        includeWindowsUser: includeUserInput.checked,
-        localHistoryPath: localHistoryInput.value,
-        archiveMirrorPath: archiveMirrorInput.value,
-        localCachePath: localCacheInput.value,
-        cacheExpirationHours: Number(cacheExpirationHoursInput.value || 24),
-        nasSyncIntervalMinutes: Number(nasSyncIntervalInput.value || 60),
-        cacheWarningHours: parseWarningHours(cacheWarningHoursInput.value),
-        maxCaptureDurationSeconds: Number(maxCaptureDurationInput.value || 120),
-        allowSettingsEdit: allowSettingsEditInput.checked,
-        requireValidLicense: requireValidLicenseInput.checked,
-        requireEvidenceEncryption: requireEvidenceEncryptionInput.checked,
-        evidenceRetentionDays: Number(evidenceRetentionDaysInput.value || 0),
-        allowEvidenceDeletion: allowEvidenceDeletionInput.checked,
-        allowNasMirror: allowNasMirrorInput.checked,
-        adminManagedCacheEncryption: adminManagedCacheEncryptionInput.checked,
-        allowedExportFormats: ["json", "html", "package"]
-      })
-    });
-    const result = response.status === 403 ? {} : await response.json();
-    if (!response.ok) {
-      throw new Error(response.status === 403 ? "Unlock the hidden admin panel before changing enterprise settings." : result.error || "Evidence settings could not be saved.");
+    const adapters = await request("/api/adapters");
+    if (!Array.isArray(adapters))
+      throw new Error("The adapter list could not be read.");
+    state.adapters = adapters;
+    $("adapterSelect").replaceChildren(
+      ...adapters.map(
+        (adapter) =>
+          new Option(`${adapter.name} · ${adapter.description}`, adapter.id),
+      ),
+    );
+    if (!adapters.length)
+      $("adapterSelect").append(new Option("No wired adapter detected", ""));
+    else
+      $("adapterSelect").value = adapters.some((a) => a.id === previous)
+        ? previous
+        : (adapters.find((a) => a.operationalStatus === "Up") || adapters[0])
+            .id;
+    updateAdapter();
+    if (adapters.some((adapter) => adapter.captureAvailable)) {
+      hideNpcapDialog();
+    } else {
+      showNpcapDialog();
     }
-    storageModeInput.value = result.storageMode || "local-nas-mirror";
-    localHistoryInput.value = result.localHistoryPath || "";
-    archiveMirrorInput.value = result.archiveMirrorPath || "";
-    localCacheInput.value = result.localCachePath || "";
-    cacheExpirationHoursInput.value = result.cacheExpirationHours || 24;
-    nasSyncIntervalInput.value = result.nasSyncIntervalMinutes || 60;
-    cacheWarningHoursInput.value = (result.cacheWarningHours || [3, 2]).join(",");
-    maxCaptureDurationInput.value = result.maxCaptureDurationSeconds || 120;
-    durationInput.max = result.maxCaptureDurationSeconds || 120;
-    if (Number(durationInput.value) > Number(durationInput.max)) durationInput.value = durationInput.max;
-    allowSettingsEditInput.checked = Boolean(result.allowSettingsEdit);
-    requireValidLicenseInput.checked = Boolean(result.requireValidLicense);
-    requireEvidenceEncryptionInput.checked = Boolean(result.requireEvidenceEncryption);
-    evidenceRetentionDaysInput.value = result.evidenceRetentionDays || 0;
-    allowEvidenceDeletionInput.checked = Boolean(result.allowEvidenceDeletion);
-    allowNasMirrorInput.checked = result.allowNasMirror !== false;
-    adminManagedCacheEncryptionInput.checked = result.adminManagedCacheEncryption !== false;
-    [storageModeInput, secureModeInput, includeUserInput, localHistoryInput, archiveMirrorInput, localCacheInput, cacheExpirationHoursInput, nasSyncIntervalInput, cacheWarningHoursInput, maxCaptureDurationInput, allowSettingsEditInput, requireValidLicenseInput, requireEvidenceEncryptionInput, evidenceRetentionDaysInput, allowEvidenceDeletionInput, allowNasMirrorInput, adminManagedCacheEncryptionInput, saveSettingsBtn]
-      .forEach(control => control.disabled = !result.allowSettingsEdit);
-    settingsStatus.textContent = "Evidence settings saved.";
-    await loadSession();
   } catch (error) {
-    settingsStatus.textContent = error.message;
+    state.adapters = [];
+    $("adapterSelect").replaceChildren(new Option("Adapters unavailable", ""));
+    updateAdapter();
+    $("status").textContent = error.message;
+    notice("Adapter discovery failed. Refresh adapters to retry.", "error");
   } finally {
-    saveSettingsBtn.disabled = false;
+    state.adapterLoading = false;
+    updateControls();
+  }
+}
+
+function startCountdown(seconds) {
+  clearInterval(state.timer);
+  const started = Date.now();
+  $("captureProgress").hidden = false;
+  $("progressBar").value = 0;
+  const tick = () => {
+    const elapsed = (Date.now() - started) / 1000;
+    const remaining = Math.max(0, Math.ceil(seconds - elapsed));
+    $("progressBar").value = Math.min(100, (elapsed / seconds) * 100);
+    $("countdown").textContent = remaining ? `${remaining}s` : "Processing";
+    $("progressText").textContent = remaining
+      ? "Listening for advertisements"
+      : "Waiting for results and evidence storage";
+    if (!remaining) clearInterval(state.timer);
+  };
+  tick();
+  state.timer = setInterval(tick, 250);
+}
+
+async function startScan(event) {
+  event.preventDefault();
+  if (state.busy || $("scanBtn").disabled || !$("captureForm").reportValidity())
+    return;
+  const adapter = selectedAdapter();
+  const seconds = Number($("durationInput").value);
+  if (
+    !Number.isInteger(seconds) ||
+    seconds < 5 ||
+    seconds > Number($("durationInput").max)
+  )
+    return;
+  state.busy = true;
+  updateControls();
+  notice();
+  $("status").textContent = "Starting passive capture...";
+  try {
+    const created = await post("/api/scans", {
+      adapterId: adapter.id,
+      durationSeconds: seconds,
+    });
+    if (!created?.scanId)
+      throw new Error("The service did not return a capture ID.");
+    state.activeScan = {
+      id: created.scanId,
+      adapterName: adapter.name,
+      adapterId: adapter.id,
+    };
+    state.result = null;
+    $("lastEvidence").hidden = true;
+    $("resultContext").hidden = true;
+    $("neighborCount").textContent = "0";
+    $("neighborList").innerHTML =
+      '<p class="sidebar-empty">Waiting for capture results.</p>';
+    $("results").innerHTML = empty(
+      "Listening for advertisements",
+      "Results will appear when the capture finishes. You can use the other workspaces while it runs.",
+    );
+    $("status").textContent = `Listening on ${adapter.name}.`;
+    $("captureSummary").textContent = "Capture in progress";
+    startCountdown(seconds);
+    await pollScan();
+  } catch (error) {
+    state.busy = false;
+    $("status").textContent = error.message;
+    notice(error.message, "error");
+    updateControls();
+  }
+}
+
+async function pollScan() {
+  if (!state.activeScan || state.polling) return;
+  state.polling = true;
+  $("resumeScanBtn").hidden = true;
+  notice();
+  try {
+    // Bound each polling attempt, while retaining the ID if the service needs more time.
+    const deadline = Date.now() + 180000;
+    while (Date.now() < deadline) {
+      const scan = await request(
+        `/api/scans/${encodeURIComponent(state.activeScan.id)}`,
+      );
+      if (scan?.state === "complete") {
+        finishScan(scan);
+        return;
+      }
+      if (scan?.state !== "running")
+        throw new Error("The service returned an unknown capture state.");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error(
+      "The capture is taking longer than expected. Check its status again.",
+    );
+  } catch (error) {
+    clearInterval(state.timer);
+    $("progressText").textContent = "Capture status unavailable";
+    $("countdown").textContent = "Waiting";
+    $("status").textContent = error.message;
+    notice(
+      "The capture may still be running. Check its status before starting another capture.",
+      "error",
+    );
+    $("resumeScanBtn").hidden = false;
+  } finally {
+    state.polling = false;
+  }
+}
+
+function finishScan(scan) {
+  clearInterval(state.timer);
+  const context = state.activeScan;
+  state.busy = false;
+  state.activeScan = null;
+  state.result = scan.result;
+  $("captureProgress").hidden = true;
+  $("progressBar").value = 100;
+  const error = scan.error || scan.result?.error;
+  $("status").textContent =
+    error ||
+    `Capture complete. ${plural(scan.result?.framesCaptured || 0, "captured frame")}.`;
+  notice(error || "", "error");
+  $("captureSummary").textContent =
+    `${error ? "Completed with an error" : "Capture complete"} · ${formatDate(scan.result?.completedAt)}`;
+  $("resultContext").hidden = false;
+  $("resultContext").textContent =
+    `Capture adapter: ${context.adapterName} · ${context.adapterId}`;
+  renderResults(scan.result, error);
+  if (scan.evidence) {
+    $("lastEvidence").hidden = false;
+    $("lastEvidence").innerHTML =
+      `<p>Evidence saved <span class="mono">${escapeHtml(scan.evidence.evidenceId)}</span></p><button class="button small" type="button" data-open-evidence="${escapeHtml(scan.evidence.evidenceId)}">Review evidence</button>`;
+  }
+  updateControls();
+  void Promise.allSettled([loadReports(), loadPortLog()]);
+}
+
+function renderResults(result, error) {
+  const observations = result?.observations || [];
+  $("neighborCount").textContent = String(observations.length);
+  if (!observations.length) {
+    $("neighborList").innerHTML =
+      '<p class="sidebar-empty">No neighbors in this capture.</p>';
+    $("results").innerHTML = error
+      ? empty(
+          "Capture could not complete cleanly",
+          "Review the capture message above. No neighbor information is available for this attempt.",
+        )
+      : empty(
+          "No advertisements observed",
+          "The switch may not advertise LLDP or CDP on this port. Check the link and try a longer capture window.",
+        );
+    return;
+  }
+  $("neighborList").innerHTML = observations
+    .map(
+      (o, index) =>
+        `<button type="button" class="neighbor-item" data-neighbor="${index}" aria-pressed="${index === 0}"><span class="badge">${escapeHtml(o.protocol)}</span><strong>${escapeHtml(o.latest?.deviceName || o.latest?.chassisId || "Unnamed neighbor")}</strong><small>${escapeHtml(o.latest?.portId || "Port not advertised")}</small></button>`,
+    )
+    .join("");
+  selectNeighbor(0);
+}
+
+function field(label, value, className = "") {
+  const missing = value === undefined || value === null || value === "";
+  return `<div class="${className}"><dt>${escapeHtml(label)}</dt><dd${missing ? ' class="missing"' : ""}>${escapeHtml(missing ? "Not advertised" : value)}</dd></div>`;
+}
+function selectNeighbor(index) {
+  const o = state.result?.observations?.[index];
+  if (!o) return;
+  const p = o.latest || {};
+  document
+    .querySelectorAll("[data-neighbor]")
+    .forEach((button) =>
+      button.setAttribute(
+        "aria-pressed",
+        String(Number(button.dataset.neighbor) === index),
+      ),
+    );
+  $("results").innerHTML =
+    `<div class="neighbor-heading"><div><h3>${escapeHtml(p.deviceName || p.chassisId || "Unnamed neighbor")}</h3><p>Advertised switch information</p></div><span class="badge">${escapeHtml(o.protocol)}</span></div>
+    <dl class="detail-grid">${field("Switch port", p.portId, "key-value")}${field("Native VLAN", p.nativeVlan, "key-value")}${field("Voice VLAN", p.voiceVlan, "key-value")}${field("Management IP", p.managementAddress)}${field("Duplex", p.duplex)}${field("Time to live", p.ttlSeconds == null ? null : `${p.ttlSeconds}s`)}${field("Port description", p.portDescription, "wide")}${field("Chassis ID", p.chassisId)}${field("Capabilities", (p.capabilities || []).join(", "), "full")}</dl>
+    ${o.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertisements</strong><ul>${o.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}
+    <div class="detail-meta"><span>${escapeHtml(plural(o.framesSeen, "advertisement"))}</span><span>First seen ${escapeHtml(formatDate(o.firstSeen))}</span><span>Last seen ${escapeHtml(formatDate(o.lastSeen))}</span></div>
+    <details><summary>System and protocol details</summary><dl class="detail-grid">${field("System description", p.systemDescription, "full")}${field("Platform", p.platform)}${field("Software version", p.softwareVersion, "wide")}</dl><p>Decoded TLVs and unknown fields. Unknown TLV values are retained as hex.</p><pre>${escapeHtml(JSON.stringify({ details: p.details || [], unknownTlvs: p.unknownTlvs || [] }, null, 2))}</pre></details>`;
+}
+
+const settingFields = {
+  includeWindowsUser: "includeUserInput",
+  localHistoryPath: "localHistoryInput",
+  archiveMirrorPath: "archiveMirrorInput",
+  maxCaptureDurationSeconds: "maxCaptureDurationInput",
+  allowSettingsEdit: "allowSettingsEditInput",
+  requireValidLicense: "requireValidLicenseInput",
+  requireEvidenceEncryption: "requireEvidenceEncryptionInput",
+  evidenceRetentionDays: "evidenceRetentionDaysInput",
+  allowEvidenceDeletion: "allowEvidenceDeletionInput",
+  allowNasMirror: "allowNasMirrorInput",
+  storageMode: "storageModeInput",
+  localCachePath: "localCachePathInput",
+  cacheExpirationHours: "cacheExpirationHoursInput",
+  nasSyncIntervalMinutes: "nasSyncIntervalMinutesInput",
+  adminManagedCacheEncryption: "adminManagedCacheEncryptionInput",
+};
+const settingsDefaults = {
+  storageMode: "local-nas-mirror",
+  localCachePath: "",
+  cacheExpirationHours: 24,
+  nasSyncIntervalMinutes: 60,
+  adminManagedCacheEncryption: true,
+};
+function settingsRequireAdminUnlock() {
+  return Boolean(state.admin?.isConfigured && !state.admin?.isUnlocked);
+}
+function renderAdminWorkspace() {
+  const admin = state.admin || { isConfigured: false, isUnlocked: false };
+  const unlocked = Boolean(admin.isUnlocked);
+  const setupMode = !admin.isConfigured;
+  $("adminWorkspace").hidden = !unlocked && !setupMode;
+  $("adminUnlockForm").hidden = unlocked || setupMode;
+  $("lockAdminBtn").hidden = !unlocked;
+  badge(
+    "adminAccessStatus",
+    unlocked
+      ? "Administrator unlocked"
+      : admin.isConfigured
+        ? "Password required"
+        : "Initial setup",
+    unlocked ? "success" : admin.isConfigured ? "warning" : "",
+  );
+  $("adminUnlockStatus").textContent = unlocked
+    ? "Administrator workspace is active for this browser session."
+    : admin.isConfigured
+      ? "Enter the administrator password to show protected workspace tabs."
+      : "Open Access Settings to create the administrator password for this workstation.";
+  $("currentAdminPasswordInput").required = Boolean(admin.isConfigured);
+  $("adminWindowsUser").textContent =
+    state.workstation?.userName || "User identity not recorded";
+  $("adminApprovedAccount").textContent =
+    state.access?.account || "Not normalized";
+  $("adminMachine").textContent =
+    state.workstation?.machineName || "Local workstation";
+  $("adminIdentityRecording").textContent = state.settings?.includeWindowsUser
+    ? "Enabled"
+    : "Disabled";
+  $("adminPendingCache").textContent = plural(
+    state.pendingCache?.length || 0,
+    "record",
+  );
+  $("adminStaffStatus").textContent = setupMode
+    ? "Initial setup"
+    : "Administrator unlocked";
+  $("adminStaffStatus").className = `badge ${setupMode ? "warning" : "success"}`;
+  $("adminStorageMode").textContent =
+    state.settings?.storageMode || "local-nas-mirror";
+  $("adminArchiveRepository").textContent =
+    state.settings?.archiveMirrorPath || "Not configured";
+  $("approvedUsersList").innerHTML = (state.access?.approvedUsers || [])
+    .map((user) => `<li>${escapeHtml(user)}</li>`)
+    .join("");
+}
+function showAdminTab(name) {
+  if (!["staff", "access", "general"].includes(name)) name = "staff";
+  state.activeAdminTab = name;
+  document.querySelectorAll("[data-admin-tab]").forEach((tab) => {
+    const active = tab.dataset.adminTab === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+    const active = panel.dataset.adminPanel === name;
+    panel.hidden = !active;
+    panel.classList.toggle("active", active);
+  });
+}
+function renderSettingsStatus() {
+  if (!state.settings) return;
+  $("settingsStatus").textContent = state.settings.allowSettingsEdit
+    ? settingsRequireAdminUnlock()
+      ? "Unlock administrator access to save protected settings."
+      : "Changes apply to future captures."
+    : "Settings editing is disabled by local policy.";
+}
+function applySettings(settings) {
+  settings = { ...settingsDefaults, ...settings };
+  state.settings = settings;
+  for (const [key, id] of Object.entries(settingFields)) {
+    const control = $(id);
+    if (control.type === "checkbox") control.checked = Boolean(settings[key]);
+    else if (control.tagName === "SELECT")
+      control.value = settings[key] || "local-nas-mirror";
+    else control.value = settings[key] ?? "";
+  }
+  $("durationInput").max = String(settings.maxCaptureDurationSeconds || 120);
+  if (Number($("durationInput").value) > Number($("durationInput").max))
+    $("durationInput").value = $("durationInput").max;
+  const adminLocked = settingsRequireAdminUnlock();
+  $("settingsFields").disabled = !settings.allowSettingsEdit || adminLocked;
+  $("saveSettingsBtn").disabled = !settings.allowSettingsEdit || adminLocked;
+  badge(
+    "settingsPolicy",
+    adminLocked
+      ? "Admin unlock required"
+      : settings.allowSettingsEdit
+      ? "Editable on this workstation"
+      : "Settings locked",
+    adminLocked || !settings.allowSettingsEdit ? "warning" : "",
+  );
+  renderAdminWorkspace();
+  updateControls();
+}
+function applyLicense(license) {
+  state.license = license;
+  badge(
+    "licenseStatus",
+    `${license.state}${license.edition ? ` · ${license.edition}` : ""}`,
+    license.isValid ? "success" : "",
+  );
+  $("licenseDetail").textContent = license.isValid
+    ? `${license.organization || "Licensed workstation"}${license.validUntil ? `. Valid until ${formatDate(license.validUntil)}.` : "."}`
+    : "No valid offline license is available. Captures are permitted unless policy requires a valid license.";
+  updateControls();
+}
+async function loadSession() {
+  try {
+    const session = await request("/api/session");
+    state.workstation = session.workstation;
+    state.admin = session.admin || { isConfigured: false, isUnlocked: false };
+    state.pendingCache = session.pendingCache || [];
+    state.access = session.access || state.access;
+    renderAccessGate();
+    $("sessionMachine").textContent =
+      session.workstation?.machineName || "Local workstation";
+    $("sessionUser").textContent =
+      session.workstation?.userName || "User identity not recorded";
+    applySettings(session.settings);
+    applyLicense(session.license);
+    renderSettingsStatus();
+    renderAdminWorkspace();
+    updateAdapter();
+  } catch (error) {
+    $("settingsStatus").textContent = error.message;
+    $("licenseDetail").textContent = "License status unavailable.";
+    badge("settingsPolicy", "Settings unavailable", "error");
+    notice(
+      "Settings could not be loaded. Reload the page to reconnect to JackPeek.",
+      "error",
+    );
+  }
+}
+async function saveSettings(event) {
+  event.preventDefault();
+  if (
+    !state.settings?.allowSettingsEdit ||
+    settingsRequireAdminUnlock() ||
+    state.settingsBusy ||
+    !$("settingsForm").reportValidity()
+  )
+    return;
+  if (
+    !$("allowSettingsEditInput").checked &&
+    !window.confirm(
+      "Lock settings after saving? To unlock them, you will need to edit %LOCALAPPDATA%\\JackPeek\\settings.json outside this app.",
+    )
+  )
+    return;
+  const update = {};
+  for (const [key, id] of Object.entries(settingFields)) {
+    const control = $(id);
+    update[key] =
+      control.type === "checkbox"
+        ? control.checked
+        : control.type === "number"
+          ? Number(control.value)
+          : control.value.trim();
+  }
+  // Preserve legacy and export policy fields that this form does not edit.
+  state.settingsBusy = true;
+  $("saveSettingsBtn").disabled = true;
+  $("settingsFields").disabled = true;
+  updateControls();
+  $("settingsStatus").textContent = "Saving settings...";
+  try {
+    applySettings(await post("/api/evidence/settings", update, adminHeaders()));
+    $("settingsStatus").textContent = state.settings.allowSettingsEdit
+      ? "Settings saved."
+      : "Settings saved and editing locked.";
+    const session = await request("/api/session");
+    state.workstation = session.workstation;
+    state.admin = { ...(session.admin || state.admin), isUnlocked: state.admin.isUnlocked };
+    state.pendingCache = session.pendingCache || [];
+    state.access = session.access || state.access;
+    renderAccessGate();
+    $("sessionUser").textContent =
+      session.workstation?.userName || "User identity not recorded";
+    applyLicense(session.license);
+    renderAdminWorkspace();
+    updateAdapter();
+    state.selectedReport = null;
+    $("reportDetail").hidden = true;
+    await loadReports();
+  } catch (error) {
+    $("settingsStatus").textContent = error.message;
+  } finally {
+    state.settingsBusy = false;
+    $("settingsFields").disabled =
+      !state.settings?.allowSettingsEdit || settingsRequireAdminUnlock();
+    $("saveSettingsBtn").disabled =
+      !state.settings?.allowSettingsEdit || settingsRequireAdminUnlock();
+    updateControls();
+  }
+}
+async function validateAdminPassword(password) {
+    const result = await post("/api/admin/unlock", {
+      password,
+    });
+    state.adminToken = result.token || "";
+    state.admin = { isConfigured: true, isUnlocked: Boolean(result.unlocked) };
+    renderAdminWorkspace();
+    applySettings(state.settings);
+    renderSettingsStatus();
+    return result;
+}
+async function unlockAdmin(event) {
+  event.preventDefault();
+  if (!$("adminUnlockForm").reportValidity()) return;
+  $("unlockAdminBtn").disabled = true;
+  $("adminUnlockStatus").textContent = "Checking administrator password...";
+  try {
+    const result = await validateAdminPassword($("adminPasswordInput").value);
+    $("adminPasswordInput").value = "";
+    $("adminUnlockStatus").textContent =
+      result.message || "Administrator workspace unlocked.";
+  } catch (error) {
+    $("adminUnlockStatus").textContent =
+      error.message || "Administrator password was not accepted.";
+  } finally {
+    $("unlockAdminBtn").disabled = false;
+  }
+}
+async function unlockAdminFromPortal(event) {
+  event.preventDefault();
+  if (!$("adminPortalForm").reportValidity()) return;
+  $("adminPortalSubmitBtn").disabled = true;
+  $("adminPortalStatus").textContent = "Validating administrator password...";
+  try {
+    const result = await validateAdminPassword($("adminPortalPasswordInput").value);
+    $("adminPortalPasswordInput").value = "";
+    hideAdminLoginPage();
+    showTab("settings");
+    showAdminTab("staff");
+    $("adminUnlockStatus").textContent =
+      result.message || "Administrator workspace unlocked.";
+  } catch (error) {
+    $("adminPortalStatus").textContent =
+      error.message || "Administrator password was not accepted.";
+  } finally {
+    $("adminPortalSubmitBtn").disabled = false;
+  }
+}
+async function saveAdminPassword(event) {
+  event.preventDefault();
+  if (!$("adminPasswordForm").reportValidity()) return;
+  $("saveAdminPasswordBtn").disabled = true;
+  $("adminPasswordStatus").textContent = "Saving administrator password...";
+  try {
+    await post("/api/admin/password", {
+      currentPassword: $("currentAdminPasswordInput").value,
+      newPassword: $("newAdminPasswordInput").value,
+    });
+    $("currentAdminPasswordInput").value = "";
+    $("newAdminPasswordInput").value = "";
+    state.admin = { isConfigured: true, isUnlocked: false };
+    state.adminToken = "";
+    $("adminPasswordInput").focus();
+    $("adminPasswordStatus").textContent =
+      "Administrator password saved. Unlock again to continue.";
+    renderAdminWorkspace();
+    applySettings(state.settings);
+    renderSettingsStatus();
+  } catch (error) {
+    $("adminPasswordStatus").textContent = error.message;
+  } finally {
+    $("saveAdminPasswordBtn").disabled = false;
+  }
+}
+function lockAdmin() {
+  state.adminToken = "";
+  state.admin = { ...(state.admin || {}), isUnlocked: false };
+  $("adminUnlockStatus").textContent = "Administrator workspace locked.";
+  renderAdminWorkspace();
+  applySettings(state.settings);
+  renderSettingsStatus();
+}
+async function syncPendingCache() {
+  $("syncCacheBtn").disabled = true;
+  $("syncCacheStatus").textContent = "Syncing pending NAS cache...";
+  try {
+    const result = await post("/api/evidence/sync", {}, adminHeaders());
+    state.pendingCache = await request("/api/evidence/cache");
+    $("syncCacheStatus").textContent = `${result.uploaded || 0} uploaded, ${result.failed || 0} failed, ${result.deletedExpired || 0} expired record removed.`;
+    renderAdminWorkspace();
+  } catch (error) {
+    $("syncCacheStatus").textContent = error.message;
+  } finally {
+    $("syncCacheBtn").disabled = false;
+  }
+}
+function handleBrandLogoClick(event) {
+  state.logoClicks += 1;
+  clearTimeout(state.logoClickTimer);
+  state.logoClickTimer = setTimeout(() => {
+    state.logoClicks = 0;
+  }, 2500);
+  if (state.logoClicks < 7) return;
+  event.preventDefault();
+  state.logoClicks = 0;
+  clearTimeout(state.logoClickTimer);
+  showAdminLoginPage();
+}
+async function importLicense() {
+  const file = $("licenseFileInput").files[0];
+  if (!file) return;
+  if (file.size > 1024 * 1024) {
+    $("licenseImportStatus").textContent =
+      "Choose a license file smaller than 1 MB.";
+    return;
+  }
+  $("licenseFileInput").disabled = true;
+  $("licenseImportStatus").textContent = "Validating license...";
+  try {
+    const status = await request("/api/license/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: await file.text(),
+    });
+    applyLicense(status);
+    $("licenseImportStatus").textContent = "License imported and verified.";
+    updateAdapter();
+  } catch (error) {
+    $("licenseImportStatus").textContent = error.message;
+  } finally {
+    $("licenseFileInput").disabled = false;
+    $("licenseFileInput").value = "";
   }
 }
 
 async function loadReports() {
-  reportsEl.innerHTML = `<div class="empty">Loading evidence history...</div>`;
-  const [reportsResponse, cacheResponse] = await Promise.all([fetch("/api/reports"), fetch("/api/evidence/cache")]);
-  const reports = await reportsResponse.json();
-  const pendingCache = await cacheResponse.json();
-  renderCacheWarnings(pendingCache);
-  if (!reports.length) {
-    reportsEl.innerHTML = `<div class="empty">No saved evidence reports yet.</div>`;
-    return;
-  }
-
-  reportsEl.innerHTML = reports.map(report => `<article class="report-row">
-    <div>
-      <strong>${escapeHtml(report.deviceName || "No neighbor observed")}</strong>
-      <span>${escapeHtml(report.switchPort || "Port not advertised")} - ${escapeHtml(report.machineName)} - ${escapeHtml(formatDate(report.createdAt))}</span>
-      <small>${escapeHtml(report.observations)} observation${report.observations === 1 ? "" : "s"} - ${escapeHtml(report.framesCaptured)} frame${report.framesCaptured === 1 ? "" : "s"} - ${escapeHtml(storageStateLabel(report))} - SHA-256 ${escapeHtml(report.sha256.slice(0, 16))}...</small>
-    </div>
-    <div class="report-actions">
-      ${reportLinks(report)}
-    </div>
-  </article>`).join("");
-}
-
-async function syncCache() {
-  syncCacheBtn.disabled = true;
-  cacheWarnings.innerHTML = `<div class="empty">Checking pending encrypted cache...</div>`;
+  $("refreshReportsBtn").disabled = true;
+  $("historyStatus").textContent = "Loading evidence history...";
   try {
-    const response = await fetch("/api/evidence/sync", { method: "POST" });
-    const result = await response.json();
-    cacheWarnings.innerHTML = `<div class="empty strong">NAS sync: ${result.uploaded} uploaded, ${result.deletedExpired} expired deleted, ${result.failed} failed.</div>`;
-    await loadReports();
+    const reports = await request("/api/reports");
+    if (!Array.isArray(reports))
+      throw new Error("The evidence list could not be read.");
+    state.reports = reports;
+    renderReports();
+    $("historyStatus").textContent = "";
+    if (
+      state.selectedReport &&
+      !reports.some((r) => r.evidenceId === state.selectedReport.evidenceId)
+    ) {
+      state.selectedReport = null;
+      $("reportDetail").hidden = true;
+    }
   } catch (error) {
-    cacheWarnings.innerHTML = `<div class="empty strong">${escapeHtml(error.message)}</div>`;
+    $("historyStatus").textContent = error.message;
+    $("reportCount").textContent = "History unavailable";
+    $("reports").innerHTML = empty(
+      "History could not be loaded",
+      "Refresh history to retry. Existing evidence files have not been changed.",
+    );
   } finally {
-    syncCacheBtn.disabled = false;
+    $("refreshReportsBtn").disabled = false;
   }
 }
 
-function renderCacheWarnings(items) {
-  if (!items.length) {
-    cacheWarnings.innerHTML = "";
+async function loadPortLog() {
+  $("refreshPortsBtn").disabled = true;
+  $("portStatus").textContent = "Loading port log...";
+  try {
+    const entries = await request("/api/ports/log");
+    if (!Array.isArray(entries))
+      throw new Error("The port log could not be read.");
+    state.portLog = entries;
+    renderPortLog();
+    $("portStatus").textContent = "";
+  } catch (error) {
+    $("portStatus").textContent = error.message;
+    $("portCount").textContent = "Port log unavailable";
+    $("portLog").innerHTML = empty(
+      "Port log could not be loaded",
+      "Refresh the port log to retry. Existing evidence files have not been changed.",
+    );
+  } finally {
+    $("refreshPortsBtn").disabled = false;
+  }
+}
+
+function renderPortLog() {
+  const query = $("portSearch").value.trim().toLocaleLowerCase();
+  const rows = state.portLog.filter((item) => {
+    const entry = item.entry || {};
+    return [
+      entry.switchName,
+      entry.switchChassisId,
+      entry.switchPort,
+      entry.nativeVlan,
+      entry.voiceVlan,
+      entry.managementIp,
+      entry.userName,
+      entry.workstation,
+      entry.evidenceId,
+      entry.adapterId,
+    ].some((value) =>
+      String(value || "")
+        .toLocaleLowerCase()
+        .includes(query),
+    );
+  });
+  $("portCount").textContent = query
+    ? `${rows.length} of ${plural(state.portLog.length, "port record")}`
+    : plural(rows.length, "port record");
+  if (!rows.length) {
+    $("portLog").innerHTML = empty(
+      query ? "No matching port records" : "No port records yet",
+      query
+        ? "Try a different switch, port, VLAN, IP, user, workstation, or evidence ID."
+        : "Completed captures with advertised switch information will appear here.",
+    );
     return;
   }
-
-  cacheWarnings.innerHTML = items.map(item => `<article class="cache-warning ${item.warningDue ? "urgent" : ""}">
-    <strong>${item.warningDue ? "Pending cache expiration warning" : "Pending NAS sync"}</strong>
-    <span>${escapeHtml(item.evidenceId)} expires ${escapeHtml(formatDate(item.expiresAt))}</span>
-  </article>`).join("");
+  $("portLog").innerHTML =
+    `<table><caption class="sr-only">Port scan log</caption><thead><tr><th scope="col">Date</th><th scope="col">Switch</th><th scope="col">Port</th><th scope="col">VLAN</th><th scope="col">Voice VLAN</th><th scope="col">Management IP</th><th scope="col">Scanned by</th><th scope="col">Workstation</th><th scope="col">Evidence</th><th scope="col">Changes</th></tr></thead><tbody>${rows.map(renderPortRow).join("")}</tbody></table>`;
 }
 
-function showTab(targetId) {
-  tabPanels.forEach(panel => panel.classList.toggle("active", panel.id === targetId));
-  document.querySelectorAll(".tab").forEach(button => {
-    button.classList.toggle("active", button.dataset.tabTarget === targetId);
-  });
+function renderPortRow(item) {
+  const entry = item.entry || {};
+  const changes = item.changes || [];
+  return `<tr class="${item.changedSincePrevious ? "changed-row" : ""}"><td>${escapeHtml(formatDate(entry.scannedAt))}</td><td><strong>${escapeHtml(entry.switchName || entry.switchChassisId || "Not advertised")}</strong><small class="mono">${escapeHtml((entry.protocols || []).join(", ") || "Protocol not recorded")}</small></td><td><strong>${escapeHtml(entry.switchPort || "Not advertised")}</strong>${entry.hasCompleteIdentity ? "" : '<small class="identity-state">Incomplete identity</small>'}</td><td>${escapeHtml(entry.nativeVlan ?? "Not advertised")}</td><td>${escapeHtml(entry.voiceVlan ?? "Not advertised")}</td><td class="mono">${escapeHtml(entry.managementIp || "Not advertised")}</td><td>${escapeHtml(entry.userName || "Not recorded")}</td><td>${escapeHtml(entry.workstation || "Not recorded")}</td><td><button class="button small" type="button" data-report="${escapeHtml(entry.evidenceId)}">Review</button><small class="mono">${escapeHtml(entry.evidenceId || "Not recorded")}</small></td><td>${renderChanges(changes, entry.hasCompleteIdentity)}</td></tr>`;
 }
 
-function reportLinks(report) {
-  return `<a href="/reports/${encodeURIComponent(report.evidenceId)}.html" target="_blank" rel="noreferrer">View report</a>
-    <a href="/api/reports/${encodeURIComponent(report.evidenceId)}/download">JSON</a>
-    <a href="/api/reports/${encodeURIComponent(report.evidenceId)}/csv">CSV</a>
-    <a href="/api/reports/${encodeURIComponent(report.evidenceId)}/package">Package</a>
-    <a href="/api/reports/${encodeURIComponent(report.evidenceId)}/verify" target="_blank" rel="noreferrer">Verify</a>`;
+function renderChanges(changes, hasCompleteIdentity) {
+  if (!hasCompleteIdentity)
+    return '<span class="badge warning">Incomplete identity</span>';
+  if (!changes.length) return '<span class="badge success">No change</span>';
+  return `<div class="change-list"><span class="badge warning">${escapeHtml(plural(changes.length, "change"))}</span><details><summary>Changed fields</summary><dl>${changes.map((change) => `<div><dt>${escapeHtml(change.field)}</dt><dd>${escapeHtml(change.previous || "Not advertised")} to ${escapeHtml(change.current || "Not advertised")}</dd></div>`).join("")}</dl></details></div>`;
 }
 
-function handleAdminGesture() {
-  const now = Date.now();
-  adminClicks = [...adminClicks.filter(click => now - click < 5000), now];
-  if (adminClicks.length >= 7) {
-    adminClicks = [];
-    openAdminModal();
+function renderReports() {
+  const query = $("reportSearch").value.trim().toLocaleLowerCase();
+  const reports = state.reports.filter((r) =>
+    [
+      r.deviceName,
+      r.switchPort,
+      r.machineName,
+      r.evidenceId,
+      formatDate(r.createdAt),
+    ].some((v) =>
+      String(v || "")
+        .toLocaleLowerCase()
+        .includes(query),
+    ),
+  );
+  $("reportCount").textContent = query
+    ? `${reports.length} of ${plural(state.reports.length, "report")}`
+    : plural(reports.length, "report");
+  if (!reports.length) {
+    $("reports").innerHTML = empty(
+      query ? "No matching reports" : "No saved evidence yet",
+      query
+        ? "Try a different device, port, or workstation name."
+        : "Completed captures are saved here, including attempts that return no advertisements.",
+    );
+    return;
+  }
+  $("reports").innerHTML =
+    `<table><caption class="sr-only">Saved capture evidence</caption><thead><tr><th scope="col">Device / port</th><th scope="col">Captured</th><th scope="col">Workstation</th><th scope="col">Observations</th><th scope="col">Report</th></tr></thead><tbody>${reports.map((r) => `<tr class="${r.evidenceId === state.selectedReport?.evidenceId ? "selected-row" : ""}"><td><strong>${escapeHtml(r.deviceName || "No neighbor observed")}</strong><small class="mono">${escapeHtml(r.switchPort || "Port not advertised")}</small></td><td>${escapeHtml(formatDate(r.createdAt))}</td><td>${escapeHtml(r.machineName)}</td><td>${escapeHtml(r.observations)}<small>${escapeHtml(plural(r.framesCaptured, "frame"))}</small></td><td><button class="button small" type="button" data-report="${escapeHtml(r.evidenceId)}" aria-label="Review report from ${escapeHtml(formatDate(r.createdAt))}">Review</button></td></tr>`).join("")}</tbody></table>`;
+}
+async function openReport(id) {
+  const generation = ++state.reportRequest;
+  $("reportDetail").hidden = false;
+  $("reportDetail").innerHTML = '<p role="status">Loading report...</p>';
+  try {
+    const record = await request(`/api/reports/${encodeURIComponent(id)}`);
+    if (generation !== state.reportRequest) return;
+    state.selectedReport = record;
+    renderReports();
+    const base = `/api/reports/${encodeURIComponent(record.evidenceId)}`;
+    $("reportDetail").innerHTML =
+      `<div class="section-heading"><div><h2>Capture report</h2><p class="secondary-text">${escapeHtml(formatDate(record.createdAt))}</p></div><span class="badge">${escapeHtml(plural(record.scan?.observations?.length || 0, "observation"))}</span></div><dl class="detail-grid">${field("Evidence ID", record.evidenceId, "wide")}${field("Workstation", record.workstation?.machineName)}${field("Adapter ID", record.scan?.adapterId, "wide")}${field("Windows user", record.workstation?.userName || "Not recorded")}${field("Stored SHA-256", record.sha256, "full")}</dl>${record.scan?.error ? `<div class="notice error">${escapeHtml(record.scan.error)}</div>` : ""}<div class="report-actions"><a class="button small" href="/reports/${encodeURIComponent(record.evidenceId)}.html" target="_blank" rel="noopener noreferrer">Open printable report</a><a class="button small" href="${base}/download">Export JSON</a><a class="button small" href="${base}/csv">Export CSV</a><a class="button small" href="${base}/package">Download package</a><button id="verifyReportBtn" class="button small" type="button">Verify checksum</button>${state.settings?.allowEvidenceDeletion ? '<button id="deleteReportBtn" class="button small danger" type="button">Delete local report</button>' : ""}</div><p id="verificationStatus" class="verification-status" role="status">Checksum not checked. Exports contain readable evidence, even when stored files are encrypted.</p>`;
+    $("verifyReportBtn").addEventListener("click", () =>
+      verifyReport(record.evidenceId),
+    );
+    $("deleteReportBtn")?.addEventListener("click", () =>
+      deleteReport(record.evidenceId),
+    );
+  } catch (error) {
+    if (generation === state.reportRequest)
+      $("reportDetail").innerHTML = empty("Report unavailable", error.message);
   }
 }
-
-async function openAdminModal() {
-  adminModal.hidden = false;
-  adminPanel.hidden = true;
-  adminStatus.textContent = "Admin password is required for restricted controls.";
+async function verifyReport(id) {
+  const button = $("verifyReportBtn");
+  button.disabled = true;
   try {
-    const response = await fetch("/api/admin/status");
-    const status = await response.json();
-    if (!status.isConfigured) {
-      adminPanel.hidden = false;
-      adminStatus.textContent = "No admin password is configured. Create the first admin password now.";
+    const result = await request(
+      `/api/reports/${encodeURIComponent(id)}/verify`,
+    );
+    if (state.selectedReport?.evidenceId !== id) return;
+    $("verificationStatus").textContent = result.valid
+      ? "Checksum matches the stored record. This checks consistency, not authorship or authenticity."
+      : "Checksum mismatch. The report content differs from its stored checksum.";
+    $("verificationStatus").className =
+      `verification-status ${result.valid ? "success-text" : "error-text"}`;
+  } catch (error) {
+    if (state.selectedReport?.evidenceId === id)
+      $("verificationStatus").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+async function deleteReport(id) {
+  if (
+    !window.confirm(
+      `Delete local evidence ${id}? This cannot be undone. Archive copies and exported files will remain.`,
+    )
+  )
+    return;
+  const button = $("deleteReportBtn");
+  button.disabled = true;
+  try {
+    await request(`/api/reports/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (state.selectedReport?.evidenceId === id) {
+      state.selectedReport = null;
+      $("reportDetail").hidden = true;
     }
-  } catch {
-    adminStatus.textContent = "Admin status could not be checked.";
-  }
-  adminPasswordInput.focus();
-}
-
-function closeAdminModal() {
-  adminModal.hidden = true;
-  adminPasswordInput.value = "";
-}
-
-async function unlockAdmin() {
-  adminStatus.textContent = "Checking admin password...";
-  try {
-    const response = await fetch("/api/admin/unlock", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: adminPasswordInput.value })
-    });
-    if (!response.ok) throw new Error("Admin password is invalid or not configured.");
-    const result = await response.json();
-    adminToken = result.token;
-    adminPanel.hidden = false;
-    adminStatus.textContent = result.message;
-    enableEnterpriseSettings();
+    await loadReports();
+    $("historyStatus").textContent =
+      "Local report deleted. Archive copies and exports were not removed.";
   } catch (error) {
-    adminStatus.textContent = error.message;
+    if (state.selectedReport?.evidenceId === id)
+      $("verificationStatus").textContent = error.message;
+  } finally {
+    button.disabled = false;
   }
 }
 
-async function saveAdminPassword() {
-  adminStatus.textContent = "Saving admin password...";
-  try {
-    const response = await fetch("/api/admin/password", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-jackpeek-admin": adminToken || "" },
-      body: JSON.stringify({
-        currentPassword: currentAdminPasswordInput.value,
-        newPassword: newAdminPasswordInput.value
-      })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Admin password could not be saved.");
-    adminStatus.textContent = result.message;
-    currentAdminPasswordInput.value = "";
-    newAdminPasswordInput.value = "";
-  } catch (error) {
-    adminStatus.textContent = error.message;
-  }
-}
-
-async function loadLicense() {
-  const response = await fetch("/api/license");
-  const status = await response.json();
-  licenseStatus.textContent = `${status.state}${status.edition ? ` - ${status.edition}` : ""}`;
-  licenseDetail.textContent = status.detail || status.organization || status.licenseId || "Not installed";
-  licenseStatus.className = status.isValid ? "status success" : "status warning";
-}
-
-async function importLicense() {
-  const file = licenseFileInput.files[0];
-  if (!file) return;
-  licenseImportStatus.textContent = "Validating offline license...";
-  try {
-    const response = await fetch("/api/license/import", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: await file.text()
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "License is invalid.");
-    licenseImportStatus.textContent = "License imported and verified.";
-    await loadLicense();
-  } catch (error) {
-    licenseImportStatus.textContent = error.message;
-  }
-}
-
-function field(label, value, mode = "") {
-  return `<div class="field ${mode}"><span>${label}</span><strong>${escapeHtml(value || value === 0 ? value : "Not advertised")}</strong></div>`;
-}
-
-function startCountdown(seconds) {
-  clearInterval(countdownTimer);
-  const started = Date.now();
-  const total = seconds * 1000;
-  progressBar.style.width = "0%";
-  statusEl.textContent = `Listening passively for ${seconds} seconds...`;
-  countdownTimer = setInterval(() => {
-    const elapsed = Date.now() - started;
-    const remaining = Math.max(0, Math.ceil((total - elapsed) / 1000));
-    progressBar.style.width = `${Math.min(100, (elapsed / total) * 100)}%`;
-    statusEl.textContent = `Listening passively. ${remaining} seconds remaining.`;
-    if (remaining <= 0) {
-      clearInterval(countdownTimer);
-      statusEl.textContent = "Processing captured discovery frames...";
-    }
-  }, 250);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatDate(value) {
-  return new Date(value).toLocaleString();
-}
-
-function storageModeLabel(mode) {
-  if (mode === "nas-only-encrypted-cache") return "Evidence is written to NAS. Local cache is encrypted, temporary, and deleted after sync.";
-  if (mode === "local-only") return "Evidence is saved only on this workstation.";
-  return "Evidence is saved locally and mirrored to the configured NAS archive when available.";
-}
-
-function storageStateLabel(report) {
-  if (report.storageState === "pending-nas-sync") return `pending NAS sync, expires ${formatDate(report.cacheExpiresAt)}`;
-  if (report.storageState === "nas-synced") return "NAS synced";
-  if (report.storageState === "local-and-nas-synced") return "local + NAS synced";
-  return "local saved";
-}
-
-function parseWarningHours(value) {
-  const hours = String(value || "")
-    .split(",")
-    .map(part => Number(part.trim()))
-    .filter(hour => Number.isFinite(hour) && hour > 0);
-  return hours.length ? hours : [3, 2];
-}
-
-function enableEnterpriseSettings() {
-  [storageModeInput, secureModeInput, includeUserInput, localHistoryInput, archiveMirrorInput, localCacheInput, cacheExpirationHoursInput, nasSyncIntervalInput, cacheWarningHoursInput, maxCaptureDurationInput, allowSettingsEditInput, requireValidLicenseInput, requireEvidenceEncryptionInput, evidenceRetentionDaysInput, allowEvidenceDeletionInput, allowNasMirrorInput, adminManagedCacheEncryptionInput, saveSettingsBtn]
-    .forEach(control => control.disabled = false);
-}
-
-async function readError(response, fallback) {
-  try {
-    const result = await response.json();
-    return result.error || fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-Promise.all([loadAdapters(), loadSettings(), loadReports(), loadSession(), loadLicense()]).catch(error => {
-  statusEl.textContent = error.message;
+$("captureForm").addEventListener("submit", startScan);
+$("brandLogo").addEventListener("click", handleBrandLogoClick);
+$("refreshBtn").addEventListener("click", loadAdapters);
+$("adapterSelect").addEventListener("change", updateAdapter);
+$("resumeScanBtn").addEventListener("click", pollScan);
+$("neighborList").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-neighbor]");
+  if (button) selectNeighbor(Number(button.dataset.neighbor));
 });
+$("settingsForm").addEventListener("submit", saveSettings);
+$("adminUnlockForm").addEventListener("submit", unlockAdmin);
+$("adminPortalForm").addEventListener("submit", unlockAdminFromPortal);
+$("adminPortalCancelBtn").addEventListener("click", hideAdminLoginPage);
+$("adminPasswordForm").addEventListener("submit", saveAdminPassword);
+$("lockAdminBtn").addEventListener("click", lockAdmin);
+$("syncCacheBtn").addEventListener("click", syncPendingCache);
+document.querySelectorAll("[data-admin-tab]").forEach((tab) =>
+  tab.addEventListener("click", () => showAdminTab(tab.dataset.adminTab)),
+);
+$("licenseFileInput").addEventListener("change", importLicense);
+$("refreshReportsBtn").addEventListener("click", loadReports);
+$("reportSearch").addEventListener("input", renderReports);
+$("refreshPortsBtn").addEventListener("click", loadPortLog);
+$("portSearch").addEventListener("input", renderPortLog);
+$("reports").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-report]");
+  if (button) void openReport(button.dataset.report);
+});
+$("lastEvidence").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-evidence]");
+  if (button) {
+    showTab("history");
+    void openReport(button.dataset.openEvidence);
+  }
+});
+$("portLog").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-report]");
+  if (button) {
+    showTab("history");
+    void openReport(button.dataset.report);
+  }
+});
+$("npcapDismissBtn").addEventListener("click", hideNpcapDialog);
+$("npcapCheckBtn").addEventListener("click", () => {
+  hideNpcapDialog();
+  void loadAdapters();
+});
+$("npcapDialog").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideNpcapDialog();
+});
+$("adminLoginDialog").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideAdminLoginPage();
+});
+showTab(location.hash.slice(1), false);
+void Promise.allSettled([
+  loadAdapters(),
+  loadSession(),
+  loadReports(),
+  loadPortLog(),
+]);

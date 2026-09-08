@@ -7,12 +7,17 @@
     <FileVersion>1.0.0.0</FileVersion>
     <InformationalVersion>1.0</InformationalVersion>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- JackPeek hosts Kestrel directly; no IIS hosting DLL or web.config is needed. -->
+    <PublishIISAssets>false</PublishIISAssets>
   </PropertyGroup>
   <ItemGroup>
     <Content Update="wwwroot\**\*" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
     <EmbeddedResource Include="wwwroot\**\*" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetworkPortAnalyzer.Tests</_Parameter1>
+    </AssemblyAttribute>
     <None Include="app.ico" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <ProjectReference Include="..\NetworkPortAnalyzer.Capture\NetworkPortAnalyzer.Capture.csproj" />
