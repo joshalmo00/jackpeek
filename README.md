@@ -16,7 +16,9 @@ Start with [Getting started](docs/GETTING_STARTED.md), [Troubleshooting](docs/TR
 - Parses advertised switch identity, port, capabilities, management address, native VLAN, voice VLAN, and verbose TLVs.
 - Saves local evidence records with workstation name, optional Windows user, capture result, app version, timestamp, and SHA-256 hash.
 - Optionally mirrors evidence JSON files to an internal NAS or shared folder path configured by the user.
-- Maintains a port log for each observed switch port and highlights changes from the previous scan of the same port.
+- Combines matching LLDP/CDP observations into one switch-port result with Switch IP, advertised chassis MAC, VLANs, and other available values.
+- Shows Port history beside the current capture, reading matching local and configured NAS ledger records. Selecting a record compares previous and current values side by side.
+- Highlights differences between values observed in both captures. Missing values are marked as not observed, rather than treated as confirmed changes. Raw protocol evidence remains available in exports.
 
 ## What it does not do
 
@@ -54,7 +56,34 @@ Default settings path:
 %LOCALAPPDATA%\JackPeek\settings.json
 ```
 
-## Build
+## Sign-in and account administration
+
+JackPeek opens with **Log in** and **Log in as Administrator**. Windows sign-in
+checks the account running JackPeek using its exact `DOMAIN\username`, without
+converting display names to email addresses. `SBHCS\joalvarez` is initially
+approved. Other accounts must be approved by an administrator using their exact
+Windows username. The two support email addresses are contacts, not login IDs.
+
+An approved user supplies their first and last names on first login. The profile
+is saved in `%LOCALAPPDATA%\JackPeek\accounts.json` and reused on this installation.
+Future evidence, CSV exports, and port logs include the saved name when identity
+recording is enabled, alongside the original Windows identifiers. Existing
+records are not rewritten. Account approvals and names are local to this Windows
+application-data folder; they are not centrally synchronized through NAS.
+
+Administrator sign-in is reachable from both the initial and access-denied
+screens. On a new installation, that route sets up an administrator password.
+An existing installation continues to use its saved password. Seven logo clicks
+also open the administrator page; cancel restores the current workspace.
+
+Settings has two administrator tabs: **Account Manager** for approvals, account
+status, and password changes; **General Settings** for evidence storage, identity,
+retention, capture policy, licensing, and cache synchronization. Disabling an
+account prevents new sign-ins and invalidates its active user sessions. This
+local application gate does not replace Windows file permissions or enterprise
+identity management.
+
+## Build and verification
 
 The UI has Capture, Evidence history, Port log, and Settings workspaces. Capture controls and observed neighbors share one screen; protocol TLVs are expandable. Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) are bundled local pages. The application does not fetch remote fonts or interface assets.
 

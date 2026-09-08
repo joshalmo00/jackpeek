@@ -66,18 +66,7 @@ public sealed class PortLedgerStore
 
     public IReadOnlyList<PortLedgerSummary> List()
     {
-        var settings = _settings();
-        var roots = new[] { Path.Combine(settings.LocalHistoryPath, "PortLedger") };
-        var entries = roots
-            .Where(Directory.Exists)
-            .SelectMany(root => Directory.EnumerateFiles(root, "*.json"))
-            .Select(TryRead)
-            .Where(entry => entry is not null)
-            .Select(entry => entry!)
-            .GroupBy(entry => entry.LedgerId, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.OrderByDescending(entry => entry.ScannedAt).First())
-            .OrderBy(entry => entry.ScannedAt)
-            .ToArray();
+        var entries = ReadEntries(out _);
 
         var previousByPort = new Dictionary<string, PortLedgerEntry>(StringComparer.OrdinalIgnoreCase);
         var summaries = new List<PortLedgerSummary>(entries.Length);
@@ -86,12 +75,13 @@ public sealed class PortLedgerStore
             var changes = Array.Empty<PortChange>();
             if (entry.HasCompleteIdentity && !string.IsNullOrWhiteSpace(entry.IdentityKey))
             {
-                if (previousByPort.TryGetValue(entry.IdentityKey, out var previous))
+                var key = NormalizeIdentity(entry.SwitchName ?? entry.SwitchChassisId, entry.SwitchPort);
+                if (previousByPort.TryGetValue(key, out var previous))
                 {
                     changes = Compare(previous, entry).ToArray();
                 }
 
-                previousByPort[entry.IdentityKey] = entry;
+                previousByPort[key] = entry;
             }
 
             summaries.Add(new PortLedgerSummary(entry, changes, changes.Length > 0));
@@ -105,28 +95,16 @@ public sealed class PortLedgerStore
 
     internal static IReadOnlyList<PortLedgerEntry> BuildEntries(EvidenceRecord record)
     {
-        return record.Scan.Observations
-            .GroupBy(observation => IdentityGroupKey(observation.Latest), StringComparer.OrdinalIgnoreCase)
-            .Select(group => BuildEntry(record, group.ToArray()))
-            .OrderBy(entry => entry.SwitchName ?? entry.SwitchChassisId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(entry => entry.SwitchPort ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        return PortSnapshots.FromScan(record.Scan).Select(p => BuildEntry(record, p)).ToArray();
     }
 
-    private static PortLedgerEntry BuildEntry(EvidenceRecord record, IReadOnlyList<Observation> observations)
+    private static PortLedgerEntry BuildEntry(EvidenceRecord record, PortSnapshot latest)
     {
-        var latest = observations.OrderByDescending(o => o.LastSeen).First().Latest;
-        var switchName = Clean(latest.DeviceName);
-        var chassisId = Clean(latest.ChassisId);
-        var port = Clean(latest.PortId) ?? Clean(latest.PortDescription);
-        var hasCompleteIdentity = !string.IsNullOrWhiteSpace(switchName ?? chassisId) && !string.IsNullOrWhiteSpace(port);
-        var protocols = observations
-            .Select(o => o.Protocol)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
+        var switchName = latest.SwitchName;
+        var chassisId = latest.ChassisId;
+        var port = latest.Port;
+        var hasCompleteIdentity = PortSnapshots.Complete(latest);
+        var protocols = latest.Protocols;
         return new PortLedgerEntry(
             Guid.NewGuid().ToString("n"),
             record.CreatedAt,
@@ -136,7 +114,7 @@ public sealed class PortLedgerStore
             protocols,
             latest.NativeVlan,
             latest.VoiceVlan,
-            Clean(latest.ManagementAddress),
+            latest.SwitchIp,
             Clean(latest.Duplex),
             latest.Capabilities.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray(),
             record.Workstation.MachineName,
@@ -149,14 +127,53 @@ public sealed class PortLedgerStore
             hasCompleteIdentity,
             hasCompleteIdentity ? NormalizeIdentity(switchName ?? chassisId, port) : null,
             null,
-            null);
+            null,
+            record.Workstation.DisplayName,
+            latest.PortDescription);
     }
 
-    private static string IdentityGroupKey(ProtocolPacket packet)
+    private PortLedgerEntry[] ReadEntries(out bool archiveUnavailable)
     {
-        var switchIdentity = Clean(packet.DeviceName) ?? Clean(packet.ChassisId) ?? "missing-switch";
-        var port = Clean(packet.PortId) ?? Clean(packet.PortDescription) ?? "missing-port";
-        return NormalizeIdentity(switchIdentity, port);
+        archiveUnavailable = false;
+        var settings = _settings();
+        var roots = new List<(string Path, bool Archive)> { (Path.Combine(settings.LocalHistoryPath, "PortLedger"), false) };
+        if (settings.AllowNasMirror && !string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath))
+            roots.Add((Path.Combine(settings.ArchiveMirrorPath, "PortLedger"), true));
+        var rows = new List<PortLedgerEntry>();
+        foreach (var root in roots)
+        {
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(root.Path, "*.json"))
+                    if (TryRead(path) is { } entry) rows.Add(entry);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (root.Archive) archiveUnavailable = true;
+                else if (ex is not DirectoryNotFoundException) throw;
+            }
+        }
+        return rows.GroupBy(e => e.LedgerId, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).OrderBy(e => e.ScannedAt).ToArray();
+    }
+
+    internal static PortSnapshot Snapshot(PortLedgerEntry e) => new(
+        e.SwitchName, e.SwitchChassisId, PortSnapshots.Mac(e.SwitchChassisId), e.SwitchPort,
+        e.PortDescription, e.ManagementIp, e.NativeVlan, e.VoiceVlan, e.Duplex, e.Capabilities, [], e.Protocols);
+
+    public PortHistoryResult History(string? switchName, string? chassisId, string port, string? excludeEvidenceId, DateTimeOffset? before)
+    {
+        var target = new PortSnapshot(switchName, chassisId, PortSnapshots.Mac(chassisId), port, null, null, null, null, null, [], [], []);
+        if (!PortSnapshots.Complete(target)) return new([], "Port identity is incomplete. History cannot be matched safely.");
+        var records = ReadEntries(out var archiveUnavailable)
+            .Where(e => e.HasCompleteIdentity && e.EvidenceId != excludeEvidenceId && (before is null || e.ScannedAt < before) && PortSnapshots.SamePort(target, Snapshot(e), allowChassisChange: true))
+            .GroupBy(e => e.EvidenceId)
+            .SelectMany(g => PortSnapshots.Combine(g.OrderByDescending(e => e.ScannedAt).Select(Snapshot)).Select(snapshot =>
+            {
+                var entry = g.First();
+                return new PortHistoryEntry(entry.EvidenceId, entry.ScannedAt, entry.DisplayName ?? entry.UserName, entry.Workstation, snapshot);
+            }))
+            .OrderByDescending(e => e.ScannedAt).Take(250).ToArray();
+        return new(records, archiveUnavailable ? "The archive could not be read. Showing available local history." : null);
     }
 
     private static IEnumerable<PortChange> Compare(PortLedgerEntry previous, PortLedgerEntry current)
@@ -165,7 +182,7 @@ public sealed class PortLedgerStore
         {
             yield return change;
         }
-        foreach (var change in CompareText("Port", previous.SwitchPort, current.SwitchPort))
+        foreach (var change in CompareText("Port", PortSnapshots.NormalizePort(previous.SwitchPort), PortSnapshots.NormalizePort(current.SwitchPort)))
         {
             yield return change;
         }
@@ -177,7 +194,7 @@ public sealed class PortLedgerStore
         {
             yield return change;
         }
-        foreach (var change in CompareText("Management IP", previous.ManagementIp, current.ManagementIp))
+        foreach (var change in CompareText("Switch IP", previous.ManagementIp, current.ManagementIp))
         {
             yield return change;
         }
@@ -185,6 +202,7 @@ public sealed class PortLedgerStore
         {
             yield return change;
         }
+        if (previous.Protocols.Order().SequenceEqual(current.Protocols.Order()))
         foreach (var change in CompareText("Capabilities", string.Join(", ", previous.Capabilities), string.Join(", ", current.Capabilities)))
         {
             yield return change;
@@ -195,7 +213,7 @@ public sealed class PortLedgerStore
     {
         previous = Clean(previous);
         current = Clean(current);
-        if (!string.Equals(previous, current, StringComparison.OrdinalIgnoreCase))
+        if (previous is not null && current is not null && !string.Equals(previous, current, StringComparison.OrdinalIgnoreCase))
         {
             yield return new PortChange(field, previous, current);
         }
@@ -214,7 +232,7 @@ public sealed class PortLedgerStore
     }
 
     private static string NormalizeIdentity(string? switchIdentity, string? port) =>
-        $"{Clean(switchIdentity)?.ToUpperInvariant()}|{Clean(port)?.ToUpperInvariant()}";
+        $"{PortSnapshots.NormalizeSwitch(switchIdentity)}|{PortSnapshots.NormalizePort(port)}";
 
     private static string? Clean(string? value)
     {
@@ -224,3 +242,7 @@ public sealed class PortLedgerStore
 }
 
 public sealed record PortLedgerSaveResult(int EntriesWritten, int MirrorFailures);
+
+
+public sealed record PortHistoryEntry(string EvidenceId, DateTimeOffset ScannedAt, string? ScannedBy, string Workstation, PortSnapshot Port);
+public sealed record PortHistoryResult(IReadOnlyList<PortHistoryEntry> Entries, string? Warning);

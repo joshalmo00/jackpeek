@@ -4,7 +4,10 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52522";
 (async () => {
   const response = await fetch(base + "/");
   assert.equal(response.status, 200);
-  assert.equal((await fetch(base + "/api/ports/log")).status, 200);
+  for (const route of ["/api/ports/log", "/api/ports/history?port=Gi1%2F0%2F13&switchName=TEST", "/api/reports", "/api/adapters", "/api/admin/accounts", "/reports/unknown.html"]) {
+    assert.equal((await fetch(base + route)).status, 401, `Sign-in required for ${route}`);
+  }
+  assert.equal((await fetch(base + "/api/session")).status, 200);
   assert.equal(response.headers.get("x-frame-options"), "DENY");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert(
@@ -55,10 +58,10 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52522";
       durationSeconds: 5,
     }),
   });
-  assert.equal(invalid.status, 400);
-  assert((await invalid.json()).error.includes("physical wired Ethernet"));
+  assert.equal(invalid.status, 401);
+  assert((await invalid.json()).error.includes("Sign in"));
   console.log(
-    "PASS live server security headers, origin/host boundaries, content type, and adapter rejection",
+    "PASS live server security headers, origin/host boundaries, content type, and unauthenticated data/capture rejection",
   );
 })().catch((error) => {
   console.error(error);
