@@ -27,6 +27,8 @@ builder.Services.AddSingleton<ScanRegistry>();
 builder.Services.AddSingleton<EvidenceStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<AuditLog>();
+builder.Services.AddSingleton<AdminService>();
+builder.Services.AddHostedService<EvidenceSyncService>();
 
 var app = builder.Build();
 
@@ -40,14 +42,16 @@ app.MapGet("/api/adapters", (WindowsAdapterService windows, PassiveCaptureServic
     return Results.Ok(capture.GetCaptureDevices(adapters));
 });
 
-app.MapGet("/api/session", (WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses) =>
+app.MapGet("/api/session", (WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin) =>
 {
     var settings = evidence.GetSettings();
     return Results.Ok(new
     {
         workstation = identity.Capture(settings.IncludeWindowsUser),
         settings,
-        license = licenses.GetStatus()
+        license = licenses.GetStatus(),
+        admin = admin.GetStatus(),
+        pendingCache = evidence.ListPendingCache()
     });
 });
 
@@ -71,17 +75,57 @@ app.MapPost("/api/license/import", async (HttpRequest request, LicenseService li
 
 app.MapGet("/api/evidence/settings", (EvidenceStore evidence) => Results.Ok(evidence.GetSettings()));
 
-app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, EvidenceStore evidence, AuditLog audit) =>
+app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpRequest http, EvidenceStore evidence, AdminService admin, AuditLog audit) =>
 {
     try
     {
-        var settings = evidence.SaveSettings(request);
+        var adminUnlocked = admin.GetStatus().IsConfigured && admin.ValidateToken(http.Headers["x-jackpeek-admin"].FirstOrDefault());
+        if (admin.GetStatus().IsConfigured && !adminUnlocked)
+        {
+            audit.Write("settings.update", "blocked", detail: "admin unlock required");
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        var settings = evidence.SaveSettings(request, adminUnlocked);
         audit.Write("settings.update", "success");
         return Results.Ok(settings);
     }
     catch (Exception ex)
     {
         audit.Write("settings.update", "failed", detail: ex.Message);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/evidence/cache", (EvidenceStore evidence) => Results.Ok(evidence.ListPendingCache()));
+
+app.MapPost("/api/evidence/sync", (EvidenceStore evidence, AuditLog audit) =>
+{
+    var result = evidence.SyncPendingCache();
+    audit.Write("evidence.cache.sync", result.Failed == 0 ? "success" : "partial", detail: $"pending={result.PendingBefore}; uploaded={result.Uploaded}; deletedExpired={result.DeletedExpired}; failed={result.Failed}; lastError={result.LastError}");
+    return Results.Ok(result);
+});
+
+app.MapGet("/api/admin/status", (AdminService admin) => Results.Ok(admin.GetStatus()));
+
+app.MapPost("/api/admin/unlock", (AdminUnlockRequest request, AdminService admin, AuditLog audit) =>
+{
+    var result = admin.Unlock(request.Password);
+    audit.Write("admin.unlock", result.Unlocked ? "success" : "failed");
+    return result.Unlocked ? Results.Ok(result) : Results.Unauthorized();
+});
+
+app.MapPost("/api/admin/password", (AdminPasswordRequest request, AdminService admin, AuditLog audit) =>
+{
+    try
+    {
+        admin.SetPassword(request.CurrentPassword, request.NewPassword);
+        audit.Write("admin.password", "success");
+        return Results.Ok(new { message = "Admin password saved." });
+    }
+    catch (Exception ex)
+    {
+        audit.Write("admin.password", "failed", detail: ex.Message);
         return Results.BadRequest(new { error = ex.Message });
     }
 });
@@ -219,6 +263,10 @@ app.MapPost("/api/scans", (ScanRequest request, ScanRegistry scans, PassiveCaptu
         try
         {
             summary = evidence.SaveScan(result);
+            if (summary.AdminReviewRequired)
+            {
+                audit.Write("switch.identity.review", "admin-review-required", summary.EvidenceId, summary.AdminReviewReason);
+            }
         }
         catch (Exception ex)
         {

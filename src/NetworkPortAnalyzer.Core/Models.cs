@@ -71,7 +71,13 @@ public sealed record EvidenceSettings(
     int EvidenceRetentionDays,
     bool AllowEvidenceDeletion,
     bool AllowNasMirror,
-    IReadOnlyList<string> AllowedExportFormats);
+    IReadOnlyList<string> AllowedExportFormats,
+    string StorageMode,
+    string LocalCachePath,
+    int CacheExpirationHours,
+    IReadOnlyList<int> CacheWarningHours,
+    int NasSyncIntervalMinutes,
+    bool AdminManagedCacheEncryption);
 
 public sealed record EvidenceSummary(
     string EvidenceId,
@@ -83,9 +89,17 @@ public sealed record EvidenceSummary(
     string? SwitchPort,
     int FramesCaptured,
     int Observations,
-    string LocalJsonPath,
+    string? LocalJsonPath,
     string? MirrorJsonPath,
-    string Sha256);
+    string Sha256,
+    string StorageState,
+    DateTimeOffset? CacheExpiresAt,
+    bool PriorReviewFound,
+    DateTimeOffset? PriorReviewCreatedAt,
+    string? PriorReviewEvidenceId,
+    int PriorReviewMatchScore,
+    bool AdminReviewRequired,
+    string? AdminReviewReason);
 
 public sealed record EvidenceRecord(
     string EvidenceId,
@@ -122,3 +136,19 @@ public sealed record AuditEvent(
     string Outcome,
     string? EvidenceId,
     string? Detail);
+
+public sealed record PendingEvidenceCacheItem(
+    string EvidenceId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt,
+    int HoursUntilExpiration,
+    bool WarningDue,
+    string CachePath,
+    string Sha256);
+
+public sealed record EvidenceSyncResult(
+    int PendingBefore,
+    int Uploaded,
+    int DeletedExpired,
+    int Failed,
+    string? LastError);
