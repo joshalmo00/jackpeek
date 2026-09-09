@@ -72,13 +72,16 @@ records are not rewritten. Account approvals and names are local to this Windows
 application-data folder; they are not centrally synchronized through NAS.
 
 Administrator sign-in is reachable from both the initial and access-denied
-screens. On a new installation, that route sets up an administrator password.
-An existing installation continues to use its saved password. Seven logo clicks
-also open the administrator page; cancel restores the current workspace.
+screens. New installations currently bootstrap with the temporary default
+password N3t@P3k842!; only a salted PBKDF2 hash is stored locally. Change it
+from Account Manager before deployment. Existing installations continue to use
+their saved password. Seven logo clicks also open the administrator page; cancel
+restores the current workspace.
 
-Settings has two administrator tabs: **Account Manager** for approvals, account
-status, and password changes; **General Settings** for evidence storage, identity,
-retention, capture policy, licensing, and cache synchronization. Disabling an
+Settings has three administrator tabs: **Account Manager** for approvals, account
+status, and password changes; **Review Center** for identity and NAS evidence
+events; and **General Settings** for evidence storage, identity, retention,
+capture policy, licensing, and cache synchronization. Disabling an
 account prevents new sign-ins and invalidates its active user sessions. This
 local application gate does not replace Windows file permissions or enterprise
 identity management.

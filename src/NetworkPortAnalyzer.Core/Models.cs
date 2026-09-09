@@ -9,6 +9,12 @@ public sealed record AdapterInfo(
     IReadOnlyList<string> IpAddresses,
     bool CaptureAvailable);
 
+public sealed record AdapterTrafficSnapshot(
+    string AdapterId,
+    DateTimeOffset CapturedAt,
+    long BytesReceived,
+    long BytesSent);
+
 public sealed record RawFrame(byte[] Data, DateTimeOffset Timestamp, string AdapterId);
 
 public sealed record ProtocolPacket(
@@ -58,7 +64,10 @@ public sealed record WorkstationIdentity(
     string OperatingSystem,
     string AppVersion,
     DateTimeOffset CapturedAt,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null);
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? DisplayName = null,
+    IReadOnlyList<string>? MatchedIdentityFields = null,
+    IReadOnlyList<string>? ChangedIdentityFields = null,
+    IReadOnlyList<string>? UnannouncedIdentityFields = null);
 
 public sealed record EvidenceSettings(
     bool SecureMode,
@@ -190,3 +199,10 @@ public sealed record EvidenceSyncResult(
     int DeletedExpired,
     int Failed,
     string? LastError);
+
+public sealed record IdentityMatch(
+    int Score,
+    IReadOnlyList<string> MatchedFields,
+    IReadOnlyList<string> ChangedFields,
+    IReadOnlyList<string> UnannouncedFields,
+    string Reason);

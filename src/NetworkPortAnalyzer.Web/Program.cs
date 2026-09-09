@@ -28,6 +28,7 @@ builder.Services.AddSingleton<PortLedgerStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddSingleton<AdminService>();
+builder.Services.AddSingleton<AdminReviewStore>();
 builder.Services.AddSingleton<AccessPolicyService>();
 builder.Services.AddHostedService<EvidenceSyncService>();
 
@@ -100,12 +101,18 @@ app.MapGet("/api/adapters", (WindowsAdapterService windows, PassiveCaptureServic
     return Results.Ok(capture.GetCaptureDevices(adapters));
 });
 
+app.MapGet("/api/adapters/{adapterId}/traffic", (string adapterId, WindowsAdapterService windows) =>
+    windows.GetTrafficSnapshot(adapterId) is { } snapshot
+        ? Results.Ok(snapshot)
+        : Results.NotFound(new { error = "Traffic counters are unavailable for the selected wired adapter." }));
+
 app.MapGet("/api/session", (HttpRequest http, WindowsIdentityService identity, EvidenceStore evidence, LicenseService licenses, AdminService admin, AccessPolicyService access) =>
 {
     var settings = evidence.GetSettings();
     var accessIdentity = identity.Capture(includeWindowsUser: true);
-    var adminUnlocked = admin.ValidateToken(http.Cookies["jackpeek-admin"]);
-    var signedIn = adminUnlocked || access.ValidateSession(http.Cookies["jackpeek-session"], accessIdentity);
+    var userSignedIn = access.ValidateSession(http.Cookies["jackpeek-session"], accessIdentity);
+    var adminUnlocked = !userSignedIn && admin.ValidateToken(http.Cookies["jackpeek-admin"]);
+    var signedIn = adminUnlocked || userSignedIn;
     return Results.Ok(new
     {
         workstation = access.Enrich(identity.Capture(settings.IncludeWindowsUser)),
@@ -155,6 +162,31 @@ app.MapPost("/api/admin/accounts", (AccountApprovalRequest request, HttpRequest 
         return Results.Ok(account);
     }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+
+bool IsAdmin(HttpRequest http, AdminService admin) => admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault());
+app.MapGet("/api/admin/reviews", (HttpRequest http, AdminService admin, AdminReviewStore reviews) => IsAdmin(http, admin) ? Results.Ok(reviews.List()) : Results.StatusCode(403));
+app.MapGet("/api/admin/reviews/{evidenceId}", (string evidenceId, HttpRequest http, AdminService admin, AdminReviewStore reviews, EvidenceStore evidence) =>
+    !IsAdmin(http, admin) ? Results.StatusCode(403) : reviews.Find(evidenceId) is { } item && evidence.TryReadRecord(evidenceId) is { } record ? Results.Ok(new { item, record }) : Results.NotFound(new { error = "Review not found." }));
+app.MapPost("/api/admin/reviews/{evidenceId}/decision", (string evidenceId, AdminReviewDecisionRequest request, HttpRequest http, AdminService admin, AdminReviewStore reviews, AuditLog audit, WindowsIdentityService identity) =>
+{
+    if (!IsAdmin(http, admin)) return Results.StatusCode(403);
+    try
+    {
+        var workstation = identity.Capture(true);
+        var administrator = workstation.DisplayName ?? workstation.UserName ?? "Administrator";
+        var decision = reviews.SaveDecision(evidenceId, request.Status, request.Comment, administrator);
+        audit.Write("admin.review.decision", decision.Status, evidenceId, decision.Comment);
+        return Results.Ok(decision);
+    }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapPost("/api/admin/reviews/sync", (HttpRequest http, AdminService admin, EvidenceStore evidence, AuditLog audit) =>
+{
+    if (!IsAdmin(http, admin)) return Results.StatusCode(403);
+    var result = evidence.SyncPendingCache();
+    audit.Write("admin.review.sync", result.Failed == 0 ? "success" : "partial", detail: $"uploaded={result.Uploaded}; failed={result.Failed}");
+    return Results.Ok(result);
 });
 
 app.MapGet("/api/license", (LicenseService licenses) => Results.Ok(licenses.GetStatus()));
@@ -429,6 +461,7 @@ static IResult ServeEmbeddedWebFile(string fileName)
 }
 
 public sealed record ScanRequest(string AdapterId, int? DurationSeconds);
+public sealed record AdminReviewDecisionRequest(string Status, string? Comment);
 
 public sealed record ScanStatus(string ScanId, string State, ScanResult? Result, EvidenceSummary? Evidence, string? Error, IReadOnlyList<PortSnapshot>? Ports = null);
 

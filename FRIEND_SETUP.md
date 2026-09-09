@@ -88,7 +88,7 @@ In NAS-only mode, JackPeek keeps a local encrypted cache only while the NAS is u
 
 Switch history correlation uses the same advertised port plus at least 2 of 3 identity fields: switch name, management IP, and chassis/MAC ID. If only one field matches, JackPeek treats it as a new switch identity but still creates an admin-only `.admin-review.json` sidecar beside the NAS evidence. If exactly two fields match, JackPeek keeps the review history together but records an admin-only audit event so networking can verify whether the switch was renamed, re-IPed, moved, or replaced.
 
-The restricted admin panel is intentionally hidden from the normal technician workflow. Click the JackPeek logo 7 times within 5 seconds to open the admin password prompt. This gesture is only UI; the password check is local and protected by a salted hash. Once unlocked, admin can update enterprise settings even when normal settings edits are blocked by local policy.
+The restricted admin panel is intentionally hidden from the normal technician workflow. Click the JackPeek logo 7 times within 5 seconds to open the admin password prompt. New installations currently use the temporary bootstrap password N3t@P3k842!; change it immediately from Account Manager before deployment. Existing installations keep their saved password. The password check is local and protected by a salted hash. Once unlocked, admin can update enterprise settings even when normal settings edits are blocked by local policy.
 
 ## 6. Safety rules for changes
 

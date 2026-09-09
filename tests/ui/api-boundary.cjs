@@ -4,7 +4,7 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52522";
 (async () => {
   const response = await fetch(base + "/");
   assert.equal(response.status, 200);
-  for (const route of ["/api/ports/log", "/api/ports/history?port=Gi1%2F0%2F13&switchName=TEST", "/api/reports", "/api/adapters", "/api/admin/accounts", "/reports/unknown.html"]) {
+  for (const route of ["/api/ports/log", "/api/ports/history?port=Gi1%2F0%2F13&switchName=TEST", "/api/reports", "/api/adapters", "/api/adapters/not-a-physical-nic/traffic", "/api/admin/accounts", "/reports/unknown.html"]) {
     assert.equal((await fetch(base + route)).status, 401, `Sign-in required for ${route}`);
   }
   assert.equal((await fetch(base + "/api/session")).status, 200);

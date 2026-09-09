@@ -7,6 +7,9 @@ namespace NetworkPortAnalyzer.Web;
 
 public sealed class AdminService
 {
+    // Temporary bootstrap credential for first-run local installations.
+    // Only its salted PBKDF2 hash is persisted.
+    public const string DefaultAdminPassword = "N3t@P3k842!";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -20,6 +23,10 @@ public sealed class AdminService
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "JackPeek");
         Directory.CreateDirectory(root);
         _adminPath = Path.Combine(root, "admin.json");
+        if (!File.Exists(_adminPath))
+        {
+            SetPassword(string.Empty, DefaultAdminPassword);
+        }
     }
 
     public AdminStatus GetStatus() => new(IsConfigured(), false);

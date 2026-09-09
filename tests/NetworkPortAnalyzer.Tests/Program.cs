@@ -24,14 +24,17 @@ var tests = new (string Name, Action Test)[]
     ("leaves missing advertised fields unset", Tests.MissingFields),
     ("neutralizes formula cells and escapes CSV values", Tests.SafeCsv),
     ("package checksum matches exact JSON entry bytes", Tests.PackageChecksum),
+    ("verifies evidence integrity and detects tampering", Tests.EvidenceIntegrity),
     ("rejects remote origins and rebinding hostnames", Tests.LocalOriginPolicy),
     ("serializes captures and releases completed jobs", Tests.CaptureCoordination),
     ("detaches capture handlers on success and failure", Tests.CaptureCleanup),
     ("keeps neighbor groups distinct and reports conflicts", Tests.NeighborConflicts),
+    ("does not invent traffic counters for unknown adapters", Tests.UnknownAdapterTrafficCounters),
     ("creates port ledger rows and marks incomplete identities", Tests.PortLedgerRows),
     ("merges complementary discovery sources without mixing ports", Tests.MergePortSources),
     ("finds matching local and NAS port history", Tests.PortHistoryLookup),
     ("detects port ledger changes against the previous scan", Tests.PortLedgerChanges),
+    ("detects switch name IP and MAC identity changes", Tests.PortLedgerIdentityChanges),
     ("keeps local port ledger rows when NAS mirror fails", Tests.PortLedgerMirrorFailure)
 };
 
@@ -114,6 +117,12 @@ internal static class Tests
         Assert(entries.Single(e => e.SwitchPort == "Gi1/0/14").HasCompleteIdentity == false, "missing switch is incomplete");
     }
 
+    public static void UnknownAdapterTrafficCounters()
+    {
+        var service = new WindowsAdapterService();
+        Assert(service.GetTrafficSnapshot("not-a-physical-nic") is null, "unknown adapters do not return local traffic counters");
+    }
+
     public static void PortLedgerChanges()
     {
         var root = TempRoot();
@@ -129,6 +138,29 @@ internal static class Tests
             Assert(latest.ChangedSincePrevious, "latest row highlighted");
             Assert(latest.Changes.Any(c => c.Field == "Native VLAN" && c.Previous == "20" && c.Current == "30"), "vlan change");
             Assert(latest.Changes.Any(c => c.Field == "Switch IP" && c.Previous == "10.10.20.2" && c.Current == "10.10.30.2"), "ip change");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    public static void PortLedgerIdentityChanges()
+    {
+        var root = TempRoot();
+        try
+        {
+            var settings = TestSettings(root, null);
+            var store = new PortLedgerStore(() => settings);
+            var first = DateTimeOffset.UtcNow.AddDays(-3);
+            store.Save(Evidence("identity-1", first, [Observation("LLDP", "SW-A", "00:11:22:33:44:55", "Gi1/0/13", 20, "10.0.0.1", first)]));
+            store.Save(Evidence("identity-2", first.AddDays(1), [Observation("LLDP", "SW-B", "00:11:22:33:44:55", "Gi1/0/13", 20, "10.0.0.1", first.AddDays(1))]));
+            store.Save(Evidence("identity-3", first.AddDays(2), [Observation("LLDP", "SW-B", "00:11:22:33:44:55", "Gi1/0/13", 20, "10.0.0.2", first.AddDays(2))]));
+            store.Save(Evidence("identity-4", first.AddDays(3), [Observation("LLDP", "SW-B", "00:11:22:33:44:66", "Gi1/0/13", 20, "10.0.0.2", first.AddDays(3))]));
+            var rows = store.List();
+            Assert(rows.Single(row => row.Entry.EvidenceId == "identity-2").Changes.Any(change => change.Field == "Switch"), "name change");
+            Assert(rows.Single(row => row.Entry.EvidenceId == "identity-3").Changes.Any(change => change.Field == "Switch IP"), "IP change");
+            Assert(rows.Single(row => row.Entry.EvidenceId == "identity-4").Changes.Any(change => change.Field == "MAC / chassis ID"), "MAC change");
         }
         finally
         {
@@ -306,6 +338,19 @@ internal static class Tests
         using var manifest = JsonDocument.Parse(zip.GetEntry("manifest.json")!.Open());
         Assert(manifest.RootElement.GetProperty("sha256").GetString() == hash, "manifest file checksum");
         Assert(manifest.RootElement.GetProperty("recordSha256").GetString() == record.Sha256, "record checksum kept separately");
+    }
+
+    public static void EvidenceIntegrity()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new EvidenceStore(new WindowsIdentityService());
+        var unsigned = Evidence("integrity", now, [Observation("LLDP", "SW-INTEGRITY", "00:11:22:33:44:55", "Gi1/0/1", 10, "10.0.0.1", now)]) with { Sha256 = string.Empty };
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var hash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(unsigned, jsonOptions)))).ToLowerInvariant();
+        var valid = unsigned with { Sha256 = hash };
+        Assert(store.Verify(valid), "matching SHA-256 is valid");
+        Assert(!store.Verify(valid with { Scan = valid.Scan with { Error = "tampered" } }), "changed evidence is rejected");
+        Assert(!store.Verify(valid with { Sha256 = new string('0', 64) }), "changed checksum is rejected");
     }
 
     public static void LocalOriginPolicy()

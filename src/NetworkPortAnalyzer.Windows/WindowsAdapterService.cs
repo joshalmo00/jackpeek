@@ -22,6 +22,37 @@ public sealed class WindowsAdapterService
             .ToArray();
     }
 
+    public AdapterTrafficSnapshot? GetTrafficSnapshot(string adapterId)
+    {
+        if (string.IsNullOrWhiteSpace(adapterId))
+        {
+            return null;
+        }
+
+        var nic = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, adapterId, StringComparison.OrdinalIgnoreCase) &&
+                IsSupportedEthernetAdapter(candidate));
+        if (nic is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var stats = nic.GetIPv4Statistics();
+            return new AdapterTrafficSnapshot(
+                nic.Id,
+                DateTimeOffset.UtcNow,
+                Math.Max(0, stats.BytesReceived),
+                Math.Max(0, stats.BytesSent));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static bool IsSupportedEthernetAdapter(NetworkInterfaceType type, string name, string description, OperationalStatus status)
     {
         if (type != NetworkInterfaceType.Ethernet)

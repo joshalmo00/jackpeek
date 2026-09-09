@@ -68,20 +68,23 @@ public sealed class PortLedgerStore
     {
         var entries = ReadEntries(out _);
 
-        var previousByPort = new Dictionary<string, PortLedgerEntry>(StringComparer.OrdinalIgnoreCase);
         var summaries = new List<PortLedgerSummary>(entries.Length);
-        foreach (var entry in entries)
+        for (var index = 0; index < entries.Length; index++)
         {
+            var entry = entries[index];
             var changes = Array.Empty<PortChange>();
-            if (entry.HasCompleteIdentity && !string.IsNullOrWhiteSpace(entry.IdentityKey))
+            if (entry.HasCompleteIdentity)
             {
-                var key = NormalizeIdentity(entry.SwitchName ?? entry.SwitchChassisId, entry.SwitchPort);
-                if (previousByPort.TryGetValue(key, out var previous))
+                var previous = entries
+                    .Take(index)
+                    .Where(candidate => IdentityMatchScore(entry, candidate) >= 2)
+                    .OrderByDescending(candidate => SamePort(entry.SwitchPort, candidate.SwitchPort))
+                    .ThenByDescending(candidate => candidate.ScannedAt)
+                    .FirstOrDefault();
+                if (previous is not null)
                 {
                     changes = Compare(previous, entry).ToArray();
                 }
-
-                previousByPort[key] = entry;
             }
 
             summaries.Add(new PortLedgerSummary(entry, changes, changes.Length > 0));
@@ -198,11 +201,19 @@ public sealed class PortLedgerStore
         {
             yield return change;
         }
+        foreach (var change in CompareText("MAC / chassis ID", PortSnapshots.Mac(previous.SwitchChassisId) ?? previous.SwitchChassisId, PortSnapshots.Mac(current.SwitchChassisId) ?? current.SwitchChassisId))
+        {
+            yield return change;
+        }
+        foreach (var change in CompareText("Port description", previous.PortDescription, current.PortDescription))
+        {
+            yield return change;
+        }
         foreach (var change in CompareText("Duplex", previous.Duplex, current.Duplex))
         {
             yield return change;
         }
-        if (previous.Protocols.Order().SequenceEqual(current.Protocols.Order()))
+        if (!previous.Protocols.Order().SequenceEqual(current.Protocols.Order()))
         foreach (var change in CompareText("Capabilities", string.Join(", ", previous.Capabilities), string.Join(", ", current.Capabilities)))
         {
             yield return change;
@@ -233,6 +244,21 @@ public sealed class PortLedgerStore
 
     private static string NormalizeIdentity(string? switchIdentity, string? port) =>
         $"{PortSnapshots.NormalizeSwitch(switchIdentity)}|{PortSnapshots.NormalizePort(port)}";
+
+    private static int IdentityMatchScore(PortLedgerEntry current, PortLedgerEntry previous)
+    {
+        var currentValues = new[] { current.SwitchName, current.ManagementIp, PortSnapshots.Mac(current.SwitchChassisId) ?? current.SwitchChassisId };
+        var previousValues = new[] { previous.SwitchName, previous.ManagementIp, PortSnapshots.Mac(previous.SwitchChassisId) ?? previous.SwitchChassisId };
+        return Enumerable.Range(0, currentValues.Length).Count(index =>
+            !string.IsNullOrWhiteSpace(currentValues[index]) &&
+            !string.IsNullOrWhiteSpace(previousValues[index]) &&
+            string.Equals(currentValues[index]!.Trim(), previousValues[index]!.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool SamePort(string? current, string? previous) =>
+        !string.IsNullOrWhiteSpace(current) &&
+        !string.IsNullOrWhiteSpace(previous) &&
+        PortSnapshots.NormalizePort(current) == PortSnapshots.NormalizePort(previous);
 
     private static string? Clean(string? value)
     {

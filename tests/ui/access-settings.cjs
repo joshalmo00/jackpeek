@@ -116,6 +116,8 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52523";
           else accounts.push({ ...input, displayName: null });
         }
         body = accounts;
+      } else if (path === "/api/admin/reviews") {
+        body = [];
       } else if (path === "/api/evidence/settings") {
         savedSettings++;
         fixture.settings = { ...fixture.settings, ...input };
@@ -163,10 +165,12 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52523";
       !(await page.locator("#settingsForm").isVisible()),
       "General settings cannot leak into Account Manager",
     );
-    assert.equal(await page.locator("[data-admin-tab]").count(), 2);
+    assert.equal(await page.locator("[data-admin-tab]").count(), 3);
     await screenshot("account-manager-desktop");
     await layout();
     await axe();
+    await page.locator("#openAccountDialogBtn").click();
+    await visible("accountDialog");
     await page.locator("#accountInput").fill("SBHCS\\fixture-user");
     await page.locator("#approveAccountBtn").click();
     await page
@@ -234,8 +238,26 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52523";
       !(await page.locator("#profileScreen").isVisible()),
       "Returning user skips name registration",
     );
-    await page.locator("#settings-tab").click();
-    await visible("settingsLocked");
+    assert(
+      !(await page.locator("#settings-tab").isVisible()),
+      "Regular users cannot see Settings",
+    );
+    fixture.admin.isUnlocked = true;
+    await page.reload();
+    await page.locator("#windowsSignInBtn").click();
+    await page.locator(".topbar").waitFor();
+    assert(
+      !(await page.locator("#settings-tab").isVisible()),
+      "Regular Windows sessions ignore stale administrator state",
+    );
+    fixture.admin.isUnlocked = false;
+    await page.goto(base + "/#settings");
+    await page.locator(".topbar").waitFor();
+    await page.waitForFunction(() => location.hash !== "#settings");
+    assert(
+      !(await page.locator("#settings").isVisible()),
+      "Regular users cannot deep-link into Settings",
+    );
     console.log(
       "PASS first-login names, returning-user flow, regular-user settings protection",
     );

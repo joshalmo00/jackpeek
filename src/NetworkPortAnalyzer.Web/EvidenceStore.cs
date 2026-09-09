@@ -413,7 +413,8 @@ public sealed class EvidenceStore
             var expiresAt = state == "pending-nas-sync"
                 ? record.CreatedAt.AddHours(settings?.CacheExpirationHours ?? 24)
                 : (DateTimeOffset?)null;
-            return ToSummary(record, state == "nas-synced" ? null : path, state == "nas-synced" ? path : null, state, expiresAt, null);
+            var priorReview = FindPriorReview(record, settings ?? GetSettings());
+            return ToSummary(record, state == "nas-synced" ? null : path, state == "nas-synced" ? path : null, state, expiresAt, priorReview);
         }
         catch
         {
@@ -466,7 +467,10 @@ public sealed class EvidenceStore
             priorReview?.Score ?? 0,
             priorReview is not null && (!priorReview.ContinueHistory || priorReview.Score < 3),
             priorReview?.Reason,
-            record.Workstation.DisplayName);
+            record.Workstation.DisplayName,
+            priorReview?.MatchedFields,
+            priorReview?.ChangedFields,
+            priorReview?.UnannouncedFields);
     }
 
     private string? TryMirrorToNas(EvidenceRecord record, EvidenceSettings settings, SwitchReviewMatch? priorReview, out string? error)
@@ -660,9 +664,10 @@ public sealed class EvidenceStore
         var previous = SwitchIdentityParts(prior);
         var matched = new List<string>();
         var changed = new List<string>();
-        CompareIdentity("name", current.Name, previous.Name, matched, changed);
-        CompareIdentity("ip", current.ManagementIp, previous.ManagementIp, matched, changed);
-        CompareIdentity("mac", current.ChassisId, previous.ChassisId, matched, changed);
+        var unannounced = new List<string>();
+        CompareIdentity("name", current.Name, previous.Name, matched, changed, unannounced);
+        CompareIdentity("ip", current.ManagementIp, previous.ManagementIp, matched, changed, unannounced);
+        CompareIdentity("mac", current.ChassisId, previous.ChassisId, matched, changed, unannounced);
         if (matched.Count < 1)
         {
             return null;
@@ -677,7 +682,7 @@ public sealed class EvidenceStore
             _ when !samePort => $"Matched {string.Join("+", matched)}, but port changed or is missing. New folder created; admin should verify with networking.",
             _ => $"Matched {string.Join("+", matched)}; verify changed or missing {string.Join("+", changed)} with networking."
         };
-        return new SwitchReviewMatch(prior, matched.Count, continueHistory, reason);
+        return new SwitchReviewMatch(prior, matched.Count, continueHistory, reason, matched, changed, unannounced);
     }
 
     private static SwitchIdentityParts SwitchIdentityParts(EvidenceRecord record)
@@ -705,11 +710,11 @@ public sealed class EvidenceStore
         return FirstNonEmpty(packet.DeviceName, packet.ManagementAddress, packet.ChassisId);
     }
 
-    private static void CompareIdentity(string label, string? current, string? previous, List<string> matched, List<string> changed)
+    private static void CompareIdentity(string label, string? current, string? previous, List<string> matched, List<string> changed, List<string> unannounced)
     {
         if (string.IsNullOrWhiteSpace(current) || string.IsNullOrWhiteSpace(previous))
         {
-            changed.Add(label);
+            unannounced.Add(label);
             return;
         }
 
@@ -934,6 +939,13 @@ public sealed record EvidenceSettingsUpdate(
 
 sealed record SwitchIdentityParts(string? Name, string? ManagementIp, string? ChassisId, string? Port);
 
-sealed record SwitchReviewMatch(EvidenceRecord Record, int Score, bool ContinueHistory, string Reason);
+sealed record SwitchReviewMatch(
+    EvidenceRecord Record,
+    int Score,
+    bool ContinueHistory,
+    string Reason,
+    IReadOnlyList<string> MatchedFields,
+    IReadOnlyList<string> ChangedFields,
+    IReadOnlyList<string> UnannouncedFields);
 
 public sealed record EvidenceSaveResult(EvidenceSummary Summary, EvidenceRecord Record);
