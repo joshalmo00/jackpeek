@@ -1,0 +1,252 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:12d7a8dd-57be-94f2-6e4e-cc3fc9624e28",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "bom-ref": "jackpeek",
+      "name": "JackPeek",
+      "version": "1.0.0",
+      "description": "Local Windows passive LLDP/CDP discovery and evidence utility."
+    },
+    "tools": [
+      {
+        "vendor": "JackPeek",
+        "name": "scripts/review-artifacts.cjs"
+      }
+    ],
+    "properties": [
+      {
+        "name": "jackpeek:gitHead",
+        "value": "5cc30ce61d6fb0a4080f81c0cbedde8708f4beb8"
+      },
+      {
+        "name": "jackpeek:sourceFingerprintSha256",
+        "value": "6c6818a555a4184848bb30802803c8ad7aaf2fcb72d54bf8cfee8d3531ee3682"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/PacketDotNet@1.4.8",
+      "name": "PacketDotNet",
+      "version": "1.4.8",
+      "purl": "pkg:nuget/PacketDotNet@1.4.8",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MPL-2.0"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8f80b841a26668f0a4d0a5ec21db19aa606d78a5a3e739d70667db3e9bb8f2b139496db1c172959517fb0b783b54cf5a66a30721079d02912e0bbd67357e4f69"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Capture/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/SharpPcap@6.3.1",
+      "name": "SharpPcap",
+      "version": "6.3.1",
+      "purl": "pkg:nuget/SharpPcap@6.3.1",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "1167255f3f9075f7c1469a4547b18304bc8a880cf4e39446beee2de2070c1a8715304aba7517c29c0131ec4a7aab170f3e11f6933d7763c16a05a1d986c8773e"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Capture/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Memory@4.6.3",
+      "name": "System.Memory",
+      "version": "4.6.3",
+      "purl": "pkg:nuget/System.Memory@4.6.3",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a9d7033a09c5658e34f90f7cefa2541e7947bbb6e8b0e1d7f172124681fde1fc24ea181a79019281f65df2cad645936de5b57d656d9396371e803371b1ffbde8"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Capture/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Runtime.CompilerServices.Unsafe@6.0.0",
+      "name": "System.Runtime.CompilerServices.Unsafe",
+      "version": "6.0.0",
+      "purl": "pkg:nuget/System.Runtime.CompilerServices.Unsafe@6.0.0",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "fe251e3f7b6ad52d1774d368333e42f6dc0b4ab33f4c7faa1251e45d668fbee34eb7ef7d1bbe4dad5d0e4b612a1f1e7030dee9a29623a5cf284e30b5cb5e832e"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Capture/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Security.Cryptography.ProtectedData@8.0.0",
+      "name": "System.Security.Cryptography.ProtectedData",
+      "version": "8.0.0",
+      "purl": "pkg:nuget/System.Security.Cryptography.ProtectedData@8.0.0",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "f9350520d576ab689fc976ae417470cb80a2061aaf0c40d9795254eea7f1c9ae1a45838acd506937ee1a731db955c3c1f72c1437a0b49fc76b5a5d75d0f85912"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Text.Encoding.CodePages@9.0.5",
+      "name": "System.Text.Encoding.CodePages",
+      "version": "9.0.5",
+      "purl": "pkg:nuget/System.Text.Encoding.CodePages@9.0.5",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3fa82a0897158dd580e7411a8bde5e61d1b8af2adbd7109defbd0d850aef8fce3b0bb9b7d0227042accaca45a810cbd5e2abe351accbfe6ed431074c653a79c7"
+        }
+      ],
+      "properties": [
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Capture/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "src/NetworkPortAnalyzer.Web/packages.lock.json"
+        },
+        {
+          "name": "jackpeek:lockFile",
+          "value": "tests/NetworkPortAnalyzer.Tests/packages.lock.json"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "jackpeek",
+      "dependsOn": [
+        "pkg:nuget/PacketDotNet@1.4.8",
+        "pkg:nuget/SharpPcap@6.3.1",
+        "pkg:nuget/System.Memory@4.6.3",
+        "pkg:nuget/System.Runtime.CompilerServices.Unsafe@6.0.0",
+        "pkg:nuget/System.Security.Cryptography.ProtectedData@8.0.0",
+        "pkg:nuget/System.Text.Encoding.CodePages@9.0.5"
+      ]
+    }
+  ]
+}

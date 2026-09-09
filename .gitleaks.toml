@@ -1,0 +1,9 @@
+title = "JackPeek secret scanning"
+[extend]
+useDefault = true
+
+[[rules]]
+id = "embedded-admin-credential"
+description = "Embedded administrator bootstrap credential"
+regex = '''(?i)DefaultAdminPassword\s*=\s*"([^"]+)"'''
+secretGroup = 1

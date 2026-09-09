@@ -32,7 +32,7 @@ JackPeek is designed for sensitive environments where the safest default is loca
 - Evidence is written first to the current user's local application data folder.
 - Windows PC name and username can be recorded for audit trails, or the username can be disabled in the UI.
 - A NAS/shared archive path can be configured for on-prem history without using a cloud service.
-- The Port log workspace records switch, port, VLAN, management IP, workstation, and scanner identity for repeat visits to the same port.
+- PortLedger records switch, port, VLAN, management IP, workstation, and scanner identity for repeat visits to the same port; it supports history and inventory without a separate Port log workspace.
 - Each saved JSON evidence file includes a SHA-256 hash of the record contents to make tampering easier to detect.
 - HTML evidence reports can be opened from the history panel and printed to PDF using the browser.
 - CSV, JSON, HTML, and ZIP evidence package exports are available from the history panel.
@@ -72,11 +72,11 @@ records are not rewritten. Account approvals and names are local to this Windows
 application-data folder; they are not centrally synchronized through NAS.
 
 Administrator sign-in is reachable from both the initial and access-denied
-screens. New installations currently bootstrap with the temporary default
-password N3t@P3k842!; only a salted PBKDF2 hash is stored locally. Change it
-from Account Manager before deployment. Existing installations continue to use
-their saved password. Seven logo clicks also open the administrator page; cancel
-restores the current workspace.
+screens. New installations require an administrator to create a unique local
+password; only a salted PBKDF2 hash is stored locally. Existing installations
+continue to use their saved password. Any installation that used the retired
+shared bootstrap credential must rotate it before deployment. Seven logo clicks
+also open the administrator page; cancel restores the current workspace.
 
 Settings has three administrator tabs: **Account Manager** for approvals, account
 status, and password changes; **Review Center** for identity and NAS evidence
@@ -88,7 +88,7 @@ identity management.
 
 ## Build and verification
 
-The UI has Capture, Evidence history, Port log, and Settings workspaces. Capture controls and observed neighbors share one screen; protocol TLVs are expandable. Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) are bundled local pages. The application does not fetch remote fonts or interface assets.
+The UI has Capture and Evidence history workspaces for regular users, plus administrator-only Settings tabs for access, review, inventory, and technical assessment. Capture controls and observed neighbors share one screen; protocol details are expandable. Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) are bundled local pages. The application does not fetch remote fonts or interface assets.
 
 The legal pages describe this build's behavior. Maintainers should review them for their distribution and any applicable agreements before a public commercial release.
 

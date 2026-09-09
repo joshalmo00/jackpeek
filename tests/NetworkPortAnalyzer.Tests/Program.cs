@@ -19,7 +19,11 @@ var tests = new (string Name, Action Test)[]
     ("approves only configured Windows accounts", Tests.AccessPolicyApprovesConfiguredAccounts),
     ("rejects a license for another product", Tests.RejectsWrongLicenseProduct),
     ("rejects an expired license", Tests.RejectsExpiredLicense),
-    ("retains unknown LLDP and CDP fields as hex", Tests.UnknownTlvs),
+    ("omits unknown LLDP and CDP payloads", Tests.UnknownTlvs),
+    ("admin setup persists without an embedded credential", Tests.AdminCredentials),
+    ("redacts credential-bearing audit details", Tests.AuditRedaction),
+    ("NAS-only does not create a plaintext local ledger", Tests.NasLedgerPrivacy),
+    ("bounds parser input and TLV counts", Tests.ParserLimits),
     ("handles malformed and truncated discovery packets", Tests.MalformedPackets),
     ("leaves missing advertised fields unset", Tests.MissingFields),
     ("neutralizes formula cells and escapes CSV values", Tests.SafeCsv),
@@ -57,6 +61,54 @@ return failed == 0 ? 0 : 1;
 
 internal static class Tests
 {
+    public static void AdminCredentials()
+    {
+        var root = TempRoot();
+        try
+        {
+            var service = new AdminService(root);
+            Assert(!service.GetStatus().IsConfigured, "first run requires explicit provisioning");
+            var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+            service.SetPassword("", password);
+            var restarted = new AdminService(root);
+            Assert(restarted.GetStatus().IsConfigured, "configured state survives restart");
+            var login = restarted.Unlock(password);
+            Assert(login.Unlocked && restarted.ValidateToken(login.Token), "configured credential accepted");
+            Assert(!File.ReadAllText(Path.Combine(root, "admin.json")).Contains(password), "password is not persisted in plaintext");
+            Assert(!restarted.Unlock("wrong").Unlocked, "wrong credential rejected");
+            restarted.SetPassword(password, Convert.ToBase64String(RandomNumberGenerator.GetBytes(24)));
+            Assert(!restarted.ValidateToken(login.Token), "password change invalidates sessions");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    public static void AuditRedaction()
+    {
+        Assert(AuditLog.Redact("password=example; action=test") == "password=[REDACTED]; action=test", "assignment redacted");
+        Assert(AuditLog.Redact("Authorization: Bearer example") == "Authorization=[REDACTED]", "authorization redacted");
+        Assert(AuditLog.Redact(new string('x', 5000))!.Length == 2048, "bounded detail");
+        Assert(AuditLog.Redact(null) is null, "null is preserved");
+    }
+
+    public static void NasLedgerPrivacy()
+    {
+        var root = TempRoot();
+        try
+        {
+            var settings = TestSettings(root, null) with { StorageMode = EvidenceStore.StorageNasOnlyWithCache };
+            var store = new PortLedgerStore(() => settings);
+            store.Save(Evidence("nas", DateTimeOffset.UtcNow, [Observation("LLDP", "SW", "mac", "Gi1/1", 10, null, DateTimeOffset.UtcNow)]));
+            Assert(!Directory.Exists(Path.Combine(root, "PortLedger")), "no unencrypted ledger side copy");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    public static void ParserLimits()
+    {
+        Assert(new DiscoveryPacketParser().TryParse(new byte[65536]) is null, "oversized frames rejected");
+        var tlvs = Enumerable.Range(0, 500).Select(_ => Tlv(5, Text("Fixture"))).ToArray();
+        Assert(new DiscoveryPacketParser().TryParse(Frame(0x88cc, tlvs))!.Details.Count == 256, "TLVs bounded");
+    }
     public static void AccessPolicyApprovesConfiguredAccounts()
     {
         var root = TempRoot();
@@ -278,9 +330,9 @@ internal static class Tests
     public static void UnknownTlvs()
     {
         var lldp = new DiscoveryPacketParser().TryParse(Frame(0x88cc, Tlv(5, Text("Fixture")), Tlv(99, [0, 0xab, 0xff]), Tlv(0, [])));
-        Assert(lldp!.UnknownTlvs.Single().Value == "00abff", "LLDP hex value");
+        Assert(lldp!.UnknownTlvs.Single().Value == "Payload not retained", "LLDP unknown payload omitted");
         var cdp = new DiscoveryPacketParser().TryParse(CdpFrame(CdpTlv(1, Text("Fixture")), CdpTlv(0x9999, [0xde, 0xad])));
-        Assert(cdp!.UnknownTlvs.Single().Value == "dead", "CDP hex value");
+        Assert(cdp!.UnknownTlvs.Single().Value == "Payload not retained", "CDP unknown payload omitted");
     }
 
     public static void MalformedPackets()

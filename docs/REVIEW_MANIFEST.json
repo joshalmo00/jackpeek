@@ -1,0 +1,530 @@
+{
+  "schema": "jackpeek-review-manifest/v1",
+  "repository": "joshalmo00/jackpeek",
+  "gitHead": "5cc30ce61d6fb0a4080f81c0cbedde8708f4beb8",
+  "gitBranch": "main",
+  "sourceFileCount": 103,
+  "sourceFingerprintSha256": "6c6818a555a4184848bb30802803c8ad7aaf2fcb72d54bf8cfee8d3531ee3682",
+  "notes": [
+    "This manifest covers repository source, documentation, tests, scripts, and configuration files.",
+    "Generated review artifacts, build outputs, local test outputs, synced ChatGPT sources, and package caches are excluded.",
+    "A matching manifest proves the review package is synchronized with this checkout; it does not prove a release binary was signed."
+  ],
+  "files": [
+    {
+      "path": ".github/dependabot.yml",
+      "bytes": 259,
+      "sha256": "165ed2f1493147d59316b94736963f8710bb37de7743dd6bf089df46554ac961"
+    },
+    {
+      "path": ".github/workflows/security.yml",
+      "bytes": 1518,
+      "sha256": "809ec367ee2ab429585fa8bf5a37f07f20f04721907d6eecc7f041e39e533a3a"
+    },
+    {
+      "path": ".gitleaks.toml",
+      "bytes": 238,
+      "sha256": "af57a6ec115c4598e03d7a731bd55b1bdbb65faf17fdc1009bac260602a82f38"
+    },
+    {
+      "path": ".superdesign/design-system.md",
+      "bytes": 2714,
+      "sha256": "d5c52d1c97825c673282cc7605f13ebcff4834ebab19dc83f8d96f79cfbc4ac7"
+    },
+    {
+      "path": ".superdesign/init/components.md",
+      "bytes": 1405,
+      "sha256": "25e44004e42daefd9b122ae3fc972fc0b3636fc846c56f2356f2778993035247"
+    },
+    {
+      "path": ".superdesign/init/extractable-components.md",
+      "bytes": 975,
+      "sha256": "a34f92b3fbc6121c4c1b603704aa26b521ba670071885c94818285bb5c315186"
+    },
+    {
+      "path": ".superdesign/init/layouts.md",
+      "bytes": 1123,
+      "sha256": "59d7635821d4d925f31c81e7bb2b92b61de3aaeed8fabd53954a09464ced7504"
+    },
+    {
+      "path": ".superdesign/init/pages.md",
+      "bytes": 855,
+      "sha256": "6100b178b6df2dd2595fb4c4d9402e93fe1b5d619ce73b5e3d75546993fa6903"
+    },
+    {
+      "path": ".superdesign/init/routes.md",
+      "bytes": 725,
+      "sha256": "6889015f2a4a81e6843a0f0c827b5533056e51493e15270bfbc24a6b9dd412d6"
+    },
+    {
+      "path": ".superdesign/init/theme.md",
+      "bytes": 728,
+      "sha256": "607b551a378e049ee4b09294be58b18b0fe908276975a71bd95d4f34d25304d0"
+    },
+    {
+      "path": ".superdesign/product-direction.md",
+      "bytes": 2714,
+      "sha256": "d5c52d1c97825c673282cc7605f13ebcff4834ebab19dc83f8d96f79cfbc4ac7"
+    },
+    {
+      "path": ".superdesign/resume.json",
+      "bytes": 2721,
+      "sha256": "34f9316760b20bd0365828519171fd2ff98c42cd657f2cbfc380ded43c77b24d"
+    },
+    {
+      "path": ".superdesign/website/tanium.com/brand.json",
+      "bytes": 26314,
+      "sha256": "192312bd088662afb4652d723b1be0ef1f0640c8c3110ad3fac190a1f39d78d1"
+    },
+    {
+      "path": ".superdesign/website/tanium.com/design.md",
+      "bytes": 13759,
+      "sha256": "a45f5a1c64397d1da0a09fc7646979bec70ad2be0aae205f8becc56da14e44a6"
+    },
+    {
+      "path": "BRAND.md",
+      "bytes": 1629,
+      "sha256": "b7811e58e73b92ff3b0105355ead09cfaa53fc2b289175a131a2f387f7457b06"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 2655,
+      "sha256": "8b034700824a7b56974890188c950d3bc9bd71515dbebb62ee1f3c4b0ef43dc2"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 1760,
+      "sha256": "8f7c81980f6892f2b4ad061175f6ecd218625ab59d4abbcd52019483d966f23f"
+    },
+    {
+      "path": "Directory.Build.props",
+      "bytes": 380,
+      "sha256": "6cd05f59cd6b0225c8e552511205d7c746ee578b367f8ccaaec79b388d2b8fdc"
+    },
+    {
+      "path": "docs/ADMIN_GUIDE.md",
+      "bytes": 1329,
+      "sha256": "e2936c842745c68e259f481d33c3af01238148ab9ca62869821d648f7fcd301d"
+    },
+    {
+      "path": "docs/ADMIN_REVIEW_CENTER.md",
+      "bytes": 1259,
+      "sha256": "90c0bc8744753e40351d3110525dd266ecbc9a087c7cecfe7ec56e54f4827f06"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "bytes": 1496,
+      "sha256": "b06b09d246fe2dcecfb8e6ffe34d79af83ee856885689faa08018a2ba6ce6e72"
+    },
+    {
+      "path": "docs/DATA_FLOW.md",
+      "bytes": 1401,
+      "sha256": "b7860d8d00a8f2495c9579451978275405a63a466c1b0b8cec4ea481eb1001ba"
+    },
+    {
+      "path": "docs/DATA_RETENTION.md",
+      "bytes": 2153,
+      "sha256": "1ae46f623e213304f80356669ae1e101d110918f34eac64dc2a450de2a20ea6a"
+    },
+    {
+      "path": "docs/DEPENDENCY_POLICY.md",
+      "bytes": 1651,
+      "sha256": "22f36672be8b53db13440b2e5b9fa36291b2194ef229e21e144d00581fee9037"
+    },
+    {
+      "path": "docs/DEPLOYMENT_GUIDE.md",
+      "bytes": 1622,
+      "sha256": "998c07ea4c0f6aff155c15b7160b27d014869911f3282ab55cc742d578946a95"
+    },
+    {
+      "path": "docs/FINAL_SECURITY_REVIEW.md",
+      "bytes": 10595,
+      "sha256": "011370eefbcb83c4bc6d57fac04304b2e04742d1c08798a917e0dfca1903960a"
+    },
+    {
+      "path": "docs/FIT_REVIEW.md",
+      "bytes": 5765,
+      "sha256": "57af622287c0c3a1c091cb87fa5d6f918b0822c1ca6289c432d8f14d824170a6"
+    },
+    {
+      "path": "docs/GETTING_STARTED.md",
+      "bytes": 2417,
+      "sha256": "9d25141b370218f944f7effa59b6529b75cb1700d7efacff9ddd51fb226c40a7"
+    },
+    {
+      "path": "docs/INCIDENT_RESPONSE.md",
+      "bytes": 1853,
+      "sha256": "2f1db09937f630b4931cab5b18a548b26a4cf8e921047d9e9ec0861f7dab4bed"
+    },
+    {
+      "path": "docs/LOGGING_POLICY.md",
+      "bytes": 1523,
+      "sha256": "de4111539a2e24cb6d7056b30486bb61ec9ca980a7f16ae6f6fd94f3d0183a17"
+    },
+    {
+      "path": "docs/NETWORK_BEHAVIOR.md",
+      "bytes": 1682,
+      "sha256": "e24f504fcd5765a83de1d29f529b5298a8250a01470aea823a6d6bc307e7d978"
+    },
+    {
+      "path": "docs/PRODUCT_PRIORITIES.md",
+      "bytes": 2236,
+      "sha256": "aecc5a1b60df61ff4d8437886cb2f6498a4f76e1406b71ec98b0029cab0c3679"
+    },
+    {
+      "path": "docs/RELEASING.md",
+      "bytes": 2442,
+      "sha256": "27cf976a26f7524ca932143fa2dd8c7bd211943748817dbb96f9b6f3fe46c27a"
+    },
+    {
+      "path": "docs/SECURE_CONFIGURATION.md",
+      "bytes": 1785,
+      "sha256": "34a5274e8d2dbd781c8dac3e5ac895afaec24f79ebd8f8225c2b3305ea7cb31a"
+    },
+    {
+      "path": "docs/SECURITY_ARCHITECTURE.md",
+      "bytes": 3784,
+      "sha256": "50e72bfdd47b4a03ec5c2b7023375f740cddd26e19808a900de6aea0b022104a"
+    },
+    {
+      "path": "docs/TECHNICAL_REVIEW.md",
+      "bytes": 31051,
+      "sha256": "c9aa3a09660cd3c883fcea8919c589634c0baa939a58b0ae4cb2d42c456733c9"
+    },
+    {
+      "path": "docs/technical-review.json",
+      "bytes": 31720,
+      "sha256": "cc32709170ebd084ebd678492de39cc8d79e08a748a84bf8a4102de5f528225c"
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "bytes": 4367,
+      "sha256": "9f586bf5af5f4d959e5c14419dd52c5f01f3814cc02f909ffbc5889b079baa84"
+    },
+    {
+      "path": "docs/TROUBLESHOOTING.md",
+      "bytes": 2050,
+      "sha256": "000b4f0682fd7b830dac64159e194b2dc0a00125db1b2fc3df15f9bcb49cfd24"
+    },
+    {
+      "path": "docs/UI_POLISH_VALIDATION.md",
+      "bytes": 3232,
+      "sha256": "1fa1c4995911c4e7f91901955c399b4143cc25e5271967b32ca8eb1db618688a"
+    },
+    {
+      "path": "FRIEND_SETUP.md",
+      "bytes": 5443,
+      "sha256": "5890814dd32c3214d3b9aeeb8e2ecdc2a5c9ad6ae1549e196fce96f02b6a45dd"
+    },
+    {
+      "path": "installer/JackPeek.Installer.wixproj",
+      "bytes": 473,
+      "sha256": "1c887104b7b058ddf699f2b6ccc76f96089317942d4da98589a166e252e2869c"
+    },
+    {
+      "path": "installer/Package.wxs",
+      "bytes": 1612,
+      "sha256": "38baef13676e93e836f5c9db1c18d8b5010993e6321f2c323d525224c7711dd3"
+    },
+    {
+      "path": "NetworkPortAnalyzer.sln",
+      "bytes": 3587,
+      "sha256": "fb6d39fa9b04d82a5fcc4494676ef8e18835559390afc4db22e1655827686ffe"
+    },
+    {
+      "path": "NuGet.Config",
+      "bytes": 197,
+      "sha256": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055"
+    },
+    {
+      "path": "PRIVACY.md",
+      "bytes": 861,
+      "sha256": "917f23b1204c0bb916bbb175a3b0977877bb488c64398d23a261417c87d1941b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 10761,
+      "sha256": "4e740dc721221e613af2e2f0f16ee328a27875b2e4776e4f95843d9515bf4e41"
+    },
+    {
+      "path": "scripts/New-JackPeekLicense.ps1",
+      "bytes": 1551,
+      "sha256": "cdb9ce3d068f53a7110f90e47c57fcad5ce5e6a4292c0d9dfcca94e8702a7327"
+    },
+    {
+      "path": "scripts/release-windows.ps1",
+      "bytes": 3619,
+      "sha256": "832d9aebd0c702e2b71f60204a4df6cf337577c15d9617632164a21630b16f61"
+    },
+    {
+      "path": "scripts/review-artifacts.cjs",
+      "bytes": 6193,
+      "sha256": "b2b968f207cf17a379cc7bf52596c6a4f0e23643ac21b3c02bd4b94957ba4361"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 1640,
+      "sha256": "31528d28b7753a752946f70035beae55b50c3a5062f6832c7b5c4b5933e97a77"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Capture/NetworkPortAnalyzer.Capture.csproj",
+      "bytes": 398,
+      "sha256": "6c16d6c4c04f5a5f6c6dfbdd696921b7d19dbe75fe16b7f831e6a8d8d9607157"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Capture/ObservationAggregator.cs",
+      "bytes": 1719,
+      "sha256": "92e97565b47e08c1ed0ba5ca4988dfaa4ac66035edffca49068f0f947229dbc7"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Capture/packages.lock.json",
+      "bytes": 1657,
+      "sha256": "ccc9f511acba0b430d338a56c477e6e0ee4ffcd4b11511a72dee007e4207ab34"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Capture/PassiveCaptureService.cs",
+      "bytes": 4866,
+      "sha256": "3da2616fb8310da529941156584246c84c8f7e9d026f8b0237044551c8099a87"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Core/Models.cs",
+      "bytes": 6548,
+      "sha256": "6c3df2724b3e2249ed42bf53175b0bb3fe786e46a6fc61b61cd1fabc273e7ee3"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Core/NetworkPortAnalyzer.Core.csproj",
+      "bytes": 36,
+      "sha256": "8d654c44b7bebb6b31a9f2f606927f45b5072193adc4eef8cce3f3cf3b278df3"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Core/packages.lock.json",
+      "bytes": 60,
+      "sha256": "22308ad23ccd417b5d96020fb92e203b85fad8c3788b3feadb2ca403d8ad596c"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Core/PortSnapshot.cs",
+      "bytes": 6316,
+      "sha256": "36d4d9f480df0a6298217cb5a34ae5a085cbc4721012b9ae959e334cbafb7481"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/CdpParser.cs",
+      "bytes": 5823,
+      "sha256": "7ad271dfe29b334e4844c3d06ccb4870a09bbad84f44657c6fe964c3e16a8764"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/DiscoveryPacketParser.cs",
+      "bytes": 690,
+      "sha256": "85f393cbfd528efb8566b22141a1b658bb1d65b881af63674b4055775cc95fc7"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/Endian.cs",
+      "bytes": 309,
+      "sha256": "ee25b88b3cd2d00b4f51531991470bf55a1aa8d29cb8581c776f523792618ee9"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/EthernetFrame.cs",
+      "bytes": 918,
+      "sha256": "d6dcac027783bd7fd1022181c6e156e7d0ee9a0262866527215ad7211d8c0c96"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/Hex.cs",
+      "bytes": 350,
+      "sha256": "8964a225f4d5a586eb314380c0ffd2809032e5c25cfe27bfc8bc6b8c4cd1432a"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/LldpParser.cs",
+      "bytes": 6970,
+      "sha256": "79e8a424de1f24411ff138177e1f555afe691f806dd17894ba017647afb63acf"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/NetworkPortAnalyzer.Protocols.csproj",
+      "bytes": 169,
+      "sha256": "39818fba1aec27192073b44f92ae25946cf9e75653c6e2eb93f7220f80c905d4"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Protocols/packages.lock.json",
+      "bytes": 135,
+      "sha256": "4137b1dbeae13f9698040c720b07f1f947b9f90f5300deab540379d3046d9b28"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/AccessPolicyService.cs",
+      "bytes": 6102,
+      "sha256": "d4ad707ffed91ca2cda51528618695cc543d764d251d53221fe114fd900d701d"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/AdminReviewStore.cs",
+      "bytes": 6895,
+      "sha256": "7bffc836b2befdea366a65cb9268dfbff79ef4b02d7de9dd707bc4e1b19ff951"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/AdminService.cs",
+      "bytes": 4459,
+      "sha256": "a1ea2c41268be5b7625bba79f704ea1a5ce4a7f682d7f037c0e772e0becb620f"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/app.ico",
+      "bytes": 84485,
+      "sha256": "1fa6b8641d84bf24ac6482d3e3bc9714362dceac7c2b84d5ec90094516138a66"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/AuditLog.cs",
+      "bytes": 2093,
+      "sha256": "2e64821140f11992b021a9e6f0d2feec546cd566bee462c5db1ff155d3b9a302"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/EvidenceExport.cs",
+      "bytes": 3329,
+      "sha256": "75da26ea3ac85c1b628dbe1c576cc51fd189924718ad5506e3718365bda7f9ea"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/EvidenceStore.cs",
+      "bytes": 39718,
+      "sha256": "120bdf0dd81fff5bc072a53996a24a1afcda00610906be28526c1fbe7e4c4aad"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/EvidenceSyncService.cs",
+      "bytes": 1717,
+      "sha256": "34221a8fbf1ebc9526c065d8deb99d7f177cd2fcae17180bf9110e720b676e0c"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/LicenseService.cs",
+      "bytes": 4952,
+      "sha256": "2f2297b8b660b1942ecd47bdae4c1bd62ffab56bb932f44176b168c90c74bedc"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/LocalRequestPolicy.cs",
+      "bytes": 562,
+      "sha256": "2e505b35c62b4fdf8cb0e4eb064924e9e2549c660372558b03289966b0d20e2b"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/NetworkPortAnalyzer.Web.csproj",
+      "bytes": 1555,
+      "sha256": "d424ea4e29a46f72efc8303f6e025031490dc029807e286253bf250767e49ce3"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/packages.lock.json",
+      "bytes": 2307,
+      "sha256": "ccda9cacbed406722013b05d8a63e75cc9680887bd0d01da0867be46f338159f"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/PortLedgerStore.cs",
+      "bytes": 14351,
+      "sha256": "928e3464a492b8cf17841fb0095f1e7c0d043b71b84524372ad517f52f5477f5"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/Program.cs",
+      "bytes": 26526,
+      "sha256": "3061c3fc15cec8d9a7cab766456e5ef8189967880bc7d9f673e35af84072c3f9"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/TechnicalReviewService.cs",
+      "bytes": 2222,
+      "sha256": "e97ef433cd8fcf5f5169a55bac386e9adbf23a449424b8b7b98220acad53d3c7"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/app.js",
+      "bytes": 102624,
+      "sha256": "4296adee164dd8de3c2725ab9a43313a7206eca09007252150a4342c27f5b092"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/assets/port-checker.png",
+      "bytes": 992038,
+      "sha256": "5f2c340807c84f4b894f4869c98ee2d5e978982edad81a94088b12e681394ac4"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/favicon.png",
+      "bytes": 5215,
+      "sha256": "45a1aed4831f3402ac8f98719390639944d5c814d3fc812c87296c23b3095d9f"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/index.html",
+      "bytes": 53535,
+      "sha256": "ed6ca31861690010a210539601b47ee3b56779b36a05269dca60103af9ef7ac1"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/privacy.html",
+      "bytes": 11477,
+      "sha256": "8c5dbc7e03871e9952b1204a58cb908b94223ba4a1a7a0bdf3e15596bbc4a1c0"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/styles.css",
+      "bytes": 135118,
+      "sha256": "b170b475c30c74d246ff2ed6bb2ca68e2625e0f8ee8dfed72fe9aecd1449fa65"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/technical-review.js",
+      "bytes": 5611,
+      "sha256": "8eb7468ec4a14a09d86f448ada829dea89c36a7969244d6b607f7ce1eeeec2e0"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Web/wwwroot/terms.html",
+      "bytes": 8270,
+      "sha256": "f6f929a915011decc2752e04532f828fd44517962d1a2c6f55b53034c2775573"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Windows/NetworkPortAnalyzer.Windows.csproj",
+      "bytes": 169,
+      "sha256": "39818fba1aec27192073b44f92ae25946cf9e75653c6e2eb93f7220f80c905d4"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Windows/packages.lock.json",
+      "bytes": 135,
+      "sha256": "4137b1dbeae13f9698040c720b07f1f947b9f90f5300deab540379d3046d9b28"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Windows/WindowsAdapterService.cs",
+      "bytes": 3088,
+      "sha256": "01ffde468c069855ba1b2cf1add48a4f59459efca276d944142005c13f53d0e9"
+    },
+    {
+      "path": "src/NetworkPortAnalyzer.Windows/WindowsIdentityService.cs",
+      "bytes": 1657,
+      "sha256": "030ddf604aa039e9d2781738fb6ba999b6bb85304646a51fa20a8ffa7077ed6d"
+    },
+    {
+      "path": "tests/NetworkPortAnalyzer.Tests/NetworkPortAnalyzer.Tests.csproj",
+      "bytes": 464,
+      "sha256": "786cdf6ce18400b1ebb59811ac6946bafca1ee5d5df6a2c42170f6333d3867fb"
+    },
+    {
+      "path": "tests/NetworkPortAnalyzer.Tests/packages.lock.json",
+      "bytes": 2556,
+      "sha256": "d41b0cd53d644a7a1daba2ebdd170e3a76f9bccc805fd277ff08a47e24122686"
+    },
+    {
+      "path": "tests/NetworkPortAnalyzer.Tests/Program.cs",
+      "bytes": 34528,
+      "sha256": "c7f2d12ff110f34b5cbe99cd30f4e9b119864fab85cf1c25d7442b8f26dbbd49"
+    },
+    {
+      "path": "tests/ui/access-settings.cjs",
+      "bytes": 11339,
+      "sha256": "810e68ab6e59116d72aa5ca3d85eeda250362ed5b8eb959eaa6f98e41af028e5"
+    },
+    {
+      "path": "tests/ui/api-boundary.cjs",
+      "bytes": 2404,
+      "sha256": "80c1aea40bd4c3fa3fa27a51536c2e2c73a630b2743c349582d5b145885633aa"
+    },
+    {
+      "path": "tests/ui/inventory-contract.cjs",
+      "bytes": 1686,
+      "sha256": "f3ff3ed09fa68ae9f595e30979112da18e3323ee72b07bbd683d6f8bd481162e"
+    },
+    {
+      "path": "tests/ui/light-polish.cjs",
+      "bytes": 11681,
+      "sha256": "5f20a554e1f929ee48497a4af66d53a911a2c64281deadc3700c3eb74ebb89a2"
+    },
+    {
+      "path": "tests/ui/smoke.cjs",
+      "bytes": 22538,
+      "sha256": "b3617be570825721dd1b6f0d9fd85d75cb655649a50061e80369c3dfe8828a27"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 970,
+      "sha256": "d033e03b606efa63f1039aa3809c175515b4bb39fe82bee6c5b5a0a0e78d04e0"
+    }
+  ]
+}

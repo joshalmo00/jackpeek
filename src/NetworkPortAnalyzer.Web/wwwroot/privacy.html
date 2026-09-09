@@ -32,8 +32,8 @@
         <p>JackPeek 1.0 · Updated September 9, 2026</p>
         <p>
           This policy describes the Windows application distributed through the
-          JackPeek project. It does not cover GitHub, Npcap, Cloudflare, or
-          other external websites and services.
+          JackPeek project. It does not cover GitHub, Npcap, or other external
+          websites and services opened manually by the user.
         </p>
       </div>
       <div class="legal-layout">
@@ -62,10 +62,9 @@
               installed capture drivers may perform their own network activity.
             </p>
             <p>
-              After sign-in, the speed test panel may make standard HTTPS
-              download, upload, and latency requests to Cloudflare's public
-              speed test endpoints. This measures the workstation's internet
-              path and is separate from passive switch-port discovery.
+              The observed traffic panel reads local Windows adapter byte
+              counters. It does not generate test traffic or contact an external
+              measurement service.
             </p>
           </section>
           <section id="records">
@@ -83,9 +82,10 @@
               </li>
               <li>
                 Advertised device and chassis identity, switch port, management
-                address, VLANs, capabilities, system details, and protocol TLVs.
-                Unknown TLV values are represented as hex. Unrelated packet
-                payloads are not displayed or saved as evidence.
+                address, VLANs, capabilities, system details, and protocol TLV
+                metadata. New captures do not retain unknown TLV payload bytes.
+                Older evidence may contain values saved by an earlier build.
+                Unrelated packet payloads are not displayed or saved as evidence.
               </li>
               <li>
                 Workstation name, operating system, application version,
@@ -131,29 +131,30 @@
               You can choose a different history folder, including a network
               path. If archive mirroring is allowed and a destination is
               configured, new evidence is also copied there when the location is
-              reachable. Port log rows are saved under a
-              The application maintains its evidence history in the configured
-              history location. A local port ledger may also be maintained for
-              identity matching and change detection, but it is not exposed as
-              a separate user-facing panel. These locations are controlled by
-              you or your organization. A local save can succeed even if an
-              archive copy fails.
+              reachable. The application maintains its evidence history in the
+              configured history location. A local PortLedger may also be
+              maintained for identity matching and change detection, but it is
+              not exposed as a separate user-facing panel. These locations are
+              controlled by you or your organization. A local save can succeed
+              even if an archive copy fails.
             </p>
             <p>
               New evidence files are not encrypted by default. Optional Windows
-              DPAPI encryption ties stored files to the current Windows user. It
-              does not encrypt audit entries, settings, or exported JSON, CSV,
-              HTML, and ZIP files. An encrypted archive copy may not be readable
-              from another Windows account or workstation. Windows permissions
-              and your organization's storage and backup policies also affect
-              access.
+              DPAPI encryption protects local evidence and cache files according
+              to the selected scope: current-user protection is limited to that
+              Windows user, while machine protection is intentionally available
+              to processes on the same workstation and is not an administrator-
+              only boundary. DPAPI does not encrypt audit entries, settings, or
+              exported JSON, CSV, HTML, and ZIP files. An encrypted archive copy
+              may not be readable from another Windows account or workstation.
+              Windows permissions and your organization's storage and backup
+              policies also affect access.
             </p>
             <p>
               JackPeek does not automatically send reports to its maintainers.
               Anyone you give exported files or access to storage may receive
-              the information they contain. Opening a project or Npcap link, or
-              running the internet speed test, uses an external provider subject
-              to that provider's policies.
+              the information they contain. Opening a project or Npcap link uses
+              an external website subject to that provider's policies.
             </p>
           </section>
           <section id="retention">

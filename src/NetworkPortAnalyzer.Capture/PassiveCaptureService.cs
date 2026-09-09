@@ -6,7 +6,7 @@ namespace NetworkPortAnalyzer.Capture;
 
 public sealed class PassiveCaptureService
 {
-    private const string PassiveDiscoveryFilter = "ether proto 0x88cc or ether dst 01:00:0c:cc:cc:cc";
+    public const string PassiveDiscoveryFilter = "ether proto 0x88cc or (ether dst 01:00:0c:cc:cc:cc and ether[14:4] = 0xaaaa0300 and ether[18:4] = 0x000c2000)";
     private readonly DiscoveryPacketParser _parser = new();
     private readonly Func<string, ICaptureDevice?> _deviceResolver;
 
@@ -40,16 +40,19 @@ public sealed class PassiveCaptureService
         var opened = false;
         var capturing = false;
         var limitReached = false;
+        long retainedBytes = 0;
         void OnPacketArrival(object sender, PacketCapture e)
         {
             var packet = e.GetPacket();
-            var parsed = _parser.TryParse(packet.Data);
-            if (parsed is null) return;
-            Interlocked.Increment(ref framesSeen);
             lock (packets)
             {
-                if (packets.Count < 10000) packets.Add(parsed);
-                else limitReached = true;
+                if (packets.Count >= 10000 || retainedBytes + packet.Data.Length > 4 * 1024 * 1024)
+                { limitReached = true; return; }
+                var parsed = _parser.TryParse(packet.Data);
+                if (parsed is null) return;
+                framesSeen++;
+                retainedBytes += packet.Data.Length;
+                packets.Add(parsed);
             }
         }
 
@@ -84,7 +87,7 @@ public sealed class PassiveCaptureService
             {
                 return new ScanResult(scanId, adapterId, started, completed, framesSeen,
                     ObservationAggregator.Aggregate(adapterId, packets, started, completed),
-                    limitReached ? "The 10,000-advertisement limit was reached. Results include only the retained advertisements; use a shorter capture window." : null);
+                    limitReached ? "The capture retention limit (10,000 advertisements or 4 MiB of parsed source frames) was reached. Results are partial; use a shorter capture window." : null);
             }
         }
         catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException || ex.InnerException is DllNotFoundException)

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
 using NetworkPortAnalyzer.Core;
@@ -239,8 +240,14 @@ public sealed class EvidenceStore
                 var record = ReadRecord(path);
                 if (record is null)
                 {
-                    TryDelete(path);
-                    deleted++;
+                    failed++;
+                    lastError = "Unreadable evidence retained for administrative review.";
+                    continue;
+                }
+                if (!Verify(record))
+                {
+                    failed++;
+                    lastError = "Evidence integrity warning; synchronization blocked.";
                     continue;
                 }
 
@@ -266,7 +273,7 @@ public sealed class EvidenceStore
             catch (Exception ex)
             {
                 failed++;
-                lastError = ex.Message;
+                lastError = ex.GetType().Name;
             }
         }
 
@@ -498,7 +505,7 @@ public sealed class EvidenceStore
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ex.GetType().Name;
             return null;
         }
     }
@@ -651,7 +658,7 @@ public sealed class EvidenceStore
                     return null;
                 }
             })
-            .Select(record => record is null || record.EvidenceId == current.EvidenceId ? null : BuildMatch(currentIdentity, record))
+            .Select(record => record is null || record.EvidenceId == current.EvidenceId || record.CreatedAt >= current.CreatedAt || !Verify(record) ? null : BuildMatch(currentIdentity, record))
             .Where(match => match is not null && match.Score >= 1)
             .OrderByDescending(match => match!.Score)
             .ThenByDescending(match => match!.ContinueHistory)
@@ -800,7 +807,7 @@ public sealed class EvidenceStore
         }
     }
 
-    private static string Csv(string? value) => $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+    private static string Csv(string? value) => EvidenceExport.CsvCell(value);
 
     private static string Sha256(string value)
     {
@@ -823,32 +830,66 @@ public sealed class EvidenceStore
     {
         var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(record, JsonOptions));
         var bytes = encrypted
-            ? ProtectedData.Protect(json, null, useMachineScope ? DataProtectionScope.LocalMachine : DataProtectionScope.CurrentUser)
+            ? ProtectWithDpapi(json, useMachineScope)
             : json;
         WriteBytesAtomic(path, bytes);
     }
 
     private static EvidenceRecord? ReadRecord(string path)
     {
+        if (new FileInfo(path).Length > 8 * 1024 * 1024)
+            throw new InvalidDataException("Evidence file exceeds the 8 MiB read limit.");
         var bytes = File.ReadAllBytes(path);
         if (path.EndsWith(".dpapi", StringComparison.OrdinalIgnoreCase))
         {
-            bytes = TryUnprotect(bytes, DataProtectionScope.LocalMachine) ?? TryUnprotect(bytes, DataProtectionScope.CurrentUser) ?? bytes;
+            bytes = TryUnprotectMachine(bytes) ?? TryUnprotectUser(bytes)
+                ?? throw new CryptographicException("Evidence decryption failed.");
         }
 
         return JsonSerializer.Deserialize<EvidenceRecord>(bytes, JsonOptions);
     }
 
+    private static byte[]? TryUnprotectMachine(byte[] bytes)
+    {
+#pragma warning disable CA1416
+        return TryUnprotect(bytes, DataProtectionScope.LocalMachine);
+#pragma warning restore CA1416
+    }
+
+    private static byte[]? TryUnprotectUser(byte[] bytes)
+    {
+#pragma warning disable CA1416
+        return TryUnprotect(bytes, DataProtectionScope.CurrentUser);
+#pragma warning restore CA1416
+    }
+
     private static byte[]? TryUnprotect(byte[] bytes, DataProtectionScope scope)
     {
+        if (!OperatingSystem.IsWindows()) return null;
         try
         {
-            return ProtectedData.Unprotect(bytes, null, scope);
+            return UnprotectWithDpapi(bytes, scope);
         }
         catch
         {
             return null;
         }
+    }
+
+    private static byte[] ProtectWithDpapi(byte[] bytes, bool useMachineScope)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("DPAPI evidence encryption is available only on Windows.");
+#pragma warning disable CA1416
+        return ProtectedData.Protect(bytes, null, useMachineScope ? DataProtectionScope.LocalMachine : DataProtectionScope.CurrentUser);
+#pragma warning restore CA1416
+    }
+
+    private static byte[] UnprotectWithDpapi(byte[] bytes, DataProtectionScope scope)
+    {
+#pragma warning disable CA1416
+        return ProtectedData.Unprotect(bytes, null, scope);
+#pragma warning restore CA1416
     }
 
     private static IEnumerable<string> EnumerateEvidenceFiles(string root)
@@ -858,7 +899,9 @@ public sealed class EvidenceStore
             return [];
         }
 
-        return Directory.EnumerateFiles(root, "*.json*", SearchOption.AllDirectories);
+        return Directory.EnumerateFiles(root, "JP-*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".json.dpapi", StringComparison.OrdinalIgnoreCase));
     }
 
     private static int StorageRank(string state) => state switch
@@ -893,13 +936,12 @@ public sealed class EvidenceStore
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var tempPath = $"{path}.{Guid.NewGuid():n}.tmp";
-        File.WriteAllBytes(tempPath, bytes);
-        if (File.Exists(path))
+        try
         {
-            File.Delete(path);
+            File.WriteAllBytes(tempPath, bytes);
+            File.Move(tempPath, path, true);
         }
-
-        File.Move(tempPath, path);
+        finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
     }
 
     private static void TryDelete(string path)

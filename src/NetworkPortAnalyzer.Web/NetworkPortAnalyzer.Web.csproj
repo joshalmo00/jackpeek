@@ -11,6 +11,7 @@
     <PublishIISAssets>false</PublishIISAssets>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../docs/*.md;../../docs/technical-review.json;../../docs/REVIEW_MANIFEST.json;../../docs/sbom.cdx.json;../../PRIVACY.md;../../SECURITY.md;../../THIRD_PARTY_NOTICES.md" LogicalName="technical-review/%(Filename)%(Extension)" />
     <Content Update="wwwroot\**\*" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
     <EmbeddedResource Include="wwwroot\**\*" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>

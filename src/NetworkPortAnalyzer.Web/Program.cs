@@ -8,6 +8,8 @@ using NetworkPortAnalyzer.Capture;
 using NetworkPortAnalyzer.Core;
 using NetworkPortAnalyzer.Web;
 using NetworkPortAnalyzer.Windows;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var appRoot = AppContext.BaseDirectory;
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -17,7 +19,21 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     WebRootPath = appRoot
 });
 var requestedPort = ReadPort(args) ?? 0;
-builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, requestedPort));
+builder.WebHost.UseKestrel(o =>
+{
+    o.Listen(IPAddress.Loopback, requestedPort);
+    o.Limits.MaxRequestBodySize = 1024 * 1024;
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("admin-auth", limiter =>
+    {
+        limiter.PermitLimit = 10;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+});
 
 builder.Services.AddSingleton<WindowsAdapterService>();
 builder.Services.AddSingleton<WindowsIdentityService>();
@@ -29,6 +45,7 @@ builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddSingleton<AdminService>();
 builder.Services.AddSingleton<AdminReviewStore>();
+builder.Services.AddSingleton<TechnicalReviewService>();
 builder.Services.AddSingleton<AccessPolicyService>();
 builder.Services.AddHostedService<EvidenceSyncService>();
 
@@ -41,8 +58,14 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     context.Response.Headers["X-Frame-Options"] = "DENY";
-    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://speed.cloudflare.com; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
-    context.Response.Headers.CacheControl = "no-store";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    var resourcePath = context.Request.Path.Value ?? "";
+    context.Response.Headers.CacheControl =
+        resourcePath.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+        resourcePath.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
+        resourcePath.StartsWith("/assets/", StringComparison.OrdinalIgnoreCase)
+            ? "private, max-age=0, must-revalidate" : "no-store";
     if (!LocalRequestPolicy.IsAllowedHost(context.Request.Host.Host) ||
         !LocalRequestPolicy.IsAllowedOrigin(context.Request.Headers.Origin.ToString(), context.Connection.LocalPort) ||
         context.Request.Headers["Sec-Fetch-Site"] == "cross-site")
@@ -65,6 +88,9 @@ app.Use(async (context, next) =>
         await context.Response.WriteAsJsonAsync(new { error = "JackPeek could not complete the request. Check local storage permissions and try again." });
     }
 });
+
+app.UseRouting();
+app.UseRateLimiter();
 
 // A browser session is required for capture and saved evidence. Sign-in and
 // administrator recovery stay reachable even when the Windows account is denied.
@@ -165,6 +191,15 @@ app.MapPost("/api/admin/accounts", (AccountApprovalRequest request, HttpRequest 
 });
 
 bool IsAdmin(HttpRequest http, AdminService admin) => admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault());
+app.MapGet("/api/admin/technical-review", (HttpRequest http, AdminService admin, TechnicalReviewService review) =>
+    IsAdmin(http, admin) ? Results.Ok(review.Read()) : Results.StatusCode(403));
+app.MapGet("/api/admin/technical-review/export", (HttpRequest http, AdminService admin, TechnicalReviewService review, AuditLog audit) =>
+{
+    if (!IsAdmin(http, admin)) return Results.StatusCode(403);
+    var package = review.Export();
+    audit.Write("technical-review.export", "success");
+    return Results.File(package, "application/zip", "JackPeek-Technical-Review.zip");
+});
 app.MapGet("/api/admin/reviews", (HttpRequest http, AdminService admin, AdminReviewStore reviews) => IsAdmin(http, admin) ? Results.Ok(reviews.List()) : Results.StatusCode(403));
 app.MapGet("/api/admin/reviews/{evidenceId}", (string evidenceId, HttpRequest http, AdminService admin, AdminReviewStore reviews, EvidenceStore evidence) =>
     !IsAdmin(http, admin) ? Results.StatusCode(403) : reviews.Find(evidenceId) is { } item && evidence.TryReadRecord(evidenceId) is { } record ? Results.Ok(new { item, record }) : Results.NotFound(new { error = "Review not found." }));
@@ -191,8 +226,9 @@ app.MapPost("/api/admin/reviews/sync", (HttpRequest http, AdminService admin, Ev
 
 app.MapGet("/api/license", (LicenseService licenses) => Results.Ok(licenses.GetStatus()));
 
-app.MapPost("/api/license/import", async (HttpRequest request, LicenseService licenses, AuditLog audit) =>
+app.MapPost("/api/license/import", async (HttpRequest request, LicenseService licenses, AuditLog audit, AdminService admin) =>
 {
+    if (!IsAdmin(request, admin)) return Results.StatusCode(403);
     try
     {
         using var reader = new StreamReader(request.Body);
@@ -215,7 +251,7 @@ app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpReque
     {
         var adminStatus = admin.GetStatus();
         var adminUnlocked = adminStatus.IsConfigured && admin.ValidateToken(http.Cookies["jackpeek-admin"] ?? http.Headers["x-jackpeek-admin"].FirstOrDefault());
-        if (adminStatus.IsConfigured && !adminUnlocked)
+        if (!adminUnlocked)
         {
             audit.Write("settings.update", "blocked", detail: "admin unlock required");
             return Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -255,8 +291,8 @@ app.MapPost("/api/admin/unlock", (AdminUnlockRequest request, HttpResponse respo
     var result = admin.Unlock(request.Password);
     if (result.Unlocked) response.Cookies.Append("jackpeek-admin", result.Token!, SessionCookie());
     audit.Write("admin.unlock", result.Unlocked ? "success" : "failed");
-    return result.Unlocked ? Results.Ok(result) : Results.Unauthorized();
-});
+    return result.Unlocked ? Results.Ok(new { result.Unlocked, result.Message }) : Results.Unauthorized();
+}).RequireRateLimiting("admin-auth");
 
 app.MapPost("/api/admin/password", (AdminPasswordRequest request, AdminService admin, AuditLog audit) =>
 {
@@ -271,7 +307,7 @@ app.MapPost("/api/admin/password", (AdminPasswordRequest request, AdminService a
         audit.Write("admin.password", "failed", detail: ex.GetType().Name);
         return Results.BadRequest(new { error = ex is InvalidOperationException ? ex.Message : "Admin password could not be saved." });
     }
-});
+}).RequireRateLimiting("admin-auth");
 
 app.MapGet("/api/reports", (EvidenceStore evidence) => Results.Ok(evidence.ListReports()));
 

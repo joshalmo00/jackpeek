@@ -34,13 +34,13 @@ public sealed class CdpParser
         string? chassis = null, port = null, platform = null, software = null, mgmt = null, duplex = null;
         int? nativeVlan = null, voiceVlan = null;
 
-        while (offset + 4 <= p.Length)
+        while (offset + 4 <= p.Length && details.Count + unknown.Count < 256)
         {
             var type = Endian.U16(p[offset..(offset + 2)]);
             var length = Endian.U16(p[(offset + 2)..(offset + 4)]);
             if (length < 4 || offset + length > p.Length)
             {
-                unknown.Add(new(type.ToString("x4"), "Truncated CDP TLV", Hex.Bytes(p[offset..])));
+                unknown.Add(new(type.ToString("x4"), "Truncated CDP TLV", "Payload not retained"));
                 break;
             }
 
@@ -85,7 +85,7 @@ public sealed class CdpParser
                     details.Add(new("0x000e", "Voice VLAN", voiceVlan.Value.ToString()));
                     break;
                 default:
-                    unknown.Add(new($"0x{type:x4}", "Unknown CDP TLV", Hex.Bytes(value)));
+                    unknown.Add(new($"0x{type:x4}", "Unknown CDP TLV", "Payload not retained"));
                     break;
             }
         }

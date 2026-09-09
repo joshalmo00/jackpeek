@@ -34,7 +34,7 @@ public sealed class EvidenceSyncService : BackgroundService
             }
             catch (Exception ex)
             {
-                _audit.Write("evidence.cache.sync", "failed", detail: ex.Message);
+                _audit.Write("evidence.cache.sync", "failed", detail: ex.GetType().Name);
             }
 
             await Task.Delay(delay, stoppingToken);

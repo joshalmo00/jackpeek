@@ -28,6 +28,7 @@ public sealed class AdminReviewStore
     {
         var allowed = new[] { "Confirmed", "Rejected", "Review later" };
         if (!allowed.Contains(status, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Unsupported review decision.");
+        if (comment?.Length > 2000) throw new InvalidOperationException("Comments must not exceed 2,000 characters.");
         if (_evidence.TryReadRecord(evidenceId) is null) throw new InvalidOperationException("Evidence not found.");
         var settings = _evidence.GetSettings();
         lock (_gate)
@@ -37,9 +38,13 @@ public sealed class AdminReviewStore
             decisions[evidenceId] = decision;
             var path = DecisionPath(settings);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temporary = path + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(decisions.Values.OrderBy(d => d.DecidedAt), JsonOptions));
-            File.Move(temporary, path, true);
+            var temporary = path + "." + Guid.NewGuid().ToString("n") + ".tmp";
+            try
+            {
+                File.WriteAllText(temporary, JsonSerializer.Serialize(decisions.Values.OrderBy(d => d.DecidedAt), JsonOptions));
+                File.Move(temporary, path, true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
             return decision;
         }
     }

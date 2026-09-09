@@ -8,6 +8,7 @@ public sealed class LldpParser
 {
     public ProtocolPacket? TryParse(ReadOnlyMemory<byte> payload)
     {
+        if (payload.Length > DiscoveryPacketParser.MaxFrameLength) return null;
         var data = payload.Span;
         var details = new List<TlvDetail>();
         var unknown = new List<TlvDetail>();
@@ -15,7 +16,7 @@ public sealed class LldpParser
         string? chassis = null, port = null, device = null, portDescription = null, sysDescription = null, mgmt = null;
         int? ttl = null, nativeVlan = null, voiceVlan = null;
 
-        for (var offset = 0; offset + 2 <= data.Length;)
+        for (var offset = 0; offset + 2 <= data.Length && details.Count + unknown.Count < 256;)
         {
             var header = Endian.U16(data[offset..(offset + 2)]);
             offset += 2;
@@ -23,7 +24,7 @@ public sealed class LldpParser
             var length = header & 0x01ff;
             if (offset + length > data.Length)
             {
-                unknown.Add(new("truncated", "Truncated LLDP TLV", Hex.Bytes(data[offset..])));
+                unknown.Add(new("truncated", "Truncated LLDP TLV", "Payload not retained"));
                 break;
             }
 
@@ -74,7 +75,7 @@ public sealed class LldpParser
                     details.Add(parsed);
                     break;
                 default:
-                    unknown.Add(new(type.ToString(), "Unknown LLDP TLV", Hex.Bytes(value)));
+                    unknown.Add(new(type.ToString(), "Unknown LLDP TLV", "Payload not retained"));
                     break;
             }
         }
@@ -159,7 +160,7 @@ public sealed class LldpParser
     {
         if (value.Length < 4)
         {
-            return new("127", "Organization specific", Hex.Bytes(value));
+            return new("127", "Organization specific", "Payload not retained");
         }
 
         var oui = Hex.Bytes(value[..3]);
@@ -185,7 +186,7 @@ public sealed class LldpParser
             return new("127", "LLDP-MED network policy", $"application={applicationType}; vlan={vlan}");
         }
 
-        return new("127", $"Organization specific {oui}/{subtype}", Hex.Bytes(body));
+        return new("127", $"Organization specific {oui}/{subtype}", "Payload not retained");
     }
 
     private static IEnumerable<string> DecodeCapabilities(ushort supported, ushort enabled)

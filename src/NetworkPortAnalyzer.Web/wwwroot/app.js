@@ -1,6 +1,78 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+
+// A shared viewport-level tooltip avoids clipping inside scrolling panels.
+function setupContextHelp() {
+  const tooltip = document.createElement("div");
+  tooltip.id = "contextHelp";
+  tooltip.className = "info-tooltip";
+  tooltip.role = "tooltip";
+  tooltip.hidden = true;
+  document.body.append(tooltip);
+  let trigger = null;
+  let previousDescription = null;
+  let closeTimer;
+  function close() {
+    clearTimeout(closeTimer);
+    if (trigger) {
+      if (previousDescription === null) trigger.removeAttribute("aria-describedby");
+      else trigger.setAttribute("aria-describedby", previousDescription);
+    }
+    tooltip.hidden = true;
+    trigger = null;
+  }
+  function open(button) {
+    clearTimeout(closeTimer);
+    if (!button || button === trigger) return;
+    close();
+    const description = button.dataset.help || button.getAttribute("title");
+    if (!description) return;
+    button.dataset.help = description;
+    button.removeAttribute("title");
+    trigger = button;
+    previousDescription = button.getAttribute("aria-describedby");
+    button.setAttribute("aria-describedby", [previousDescription, tooltip.id].filter(Boolean).join(" "));
+    tooltip.textContent = description;
+    tooltip.hidden = false;
+    position();
+  }
+  function position() {
+    if (!trigger) return;
+    const anchor = trigger.getBoundingClientRect();
+    if (anchor.bottom < 0 || anchor.top > innerHeight) { close(); return; }
+    const box = tooltip.getBoundingClientRect();
+    tooltip.style.left = `${Math.max(12, Math.min(anchor.left, innerWidth - box.width - 12))}px`;
+    const below = anchor.bottom + 8;
+    tooltip.style.top = `${Math.max(12, below + box.height <= innerHeight - 12 ? below : anchor.top - box.height - 8)}px`;
+  }
+  document.addEventListener("pointerover", (event) => {
+    if (tooltip.contains(event.target)) clearTimeout(closeTimer);
+    else open(event.target.closest(".info-tip"));
+  });
+  document.addEventListener("pointerout", (event) => {
+    if (event.target.closest(".info-tip, #contextHelp")) {
+      closeTimer = setTimeout(() => {
+        if (document.activeElement !== trigger) close();
+      }, 140);
+    }
+  });
+  document.addEventListener("focusin", (event) => {
+    const button = event.target.closest(".info-tip");
+    if (button) open(button);
+    else close();
+  });
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".info-tip");
+    if (button) open(button);
+    else if (!tooltip.contains(event.target)) close();
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
+  document.addEventListener("scroll", position, true);
+  window.addEventListener("resize", close);
+}
+setupContextHelp();
+
 const state = {
   adapters: [],
   settings: null,
@@ -36,14 +108,9 @@ const state = {
   signedIn: false,
   liveTraffic: {
     timer: null,
-    controller: null,
-    started: false,
-    running: false,
-    download: 0,
-    upload: 0,
-    ping: 0,
-    jitter: 0,
-    edge: "Testing",
+    adapterId: "",
+    previous: null,
+    samples: [],
     busy: false,
   },
   accounts: [],
@@ -66,7 +133,8 @@ const formatDate = (value) =>
   value && !Number.isNaN(Date.parse(value))
     ? new Date(value).toLocaleString()
     : "Not recorded";
-const plural = (value, noun) => `${value} ${noun}${value === 1 ? "" : "s"}`;
+const plural = (value, noun, pluralNoun = `${noun}s`) =>
+  `${value} ${value === 1 ? noun : pluralNoun}`;
 const storageStateLabel = (value) => ({
   "local-saved": "Local",
   "local-and-nas-synced": "NAS synchronized",
@@ -74,7 +142,6 @@ const storageStateLabel = (value) => ({
   "pending-nas-sync": "Pending synchronization",
   pending: "Cache only",
 }[value] || "Storage unavailable");
-const speedTestBase = "https://speed.cloudflare.com";
 const userDetailsAllowed = () => state.settings?.includeWindowsUser !== false;
 const empty = (title, detail) =>
   `<div class="empty-state">${emptySymbol}<h3>${escapeHtml(title)}</h3><p>${escapeHtml(detail)}</p></div>`;
@@ -108,7 +175,7 @@ function normalizeAccess(value) {
 
 function updateSettingsTabVisibility() {
   const adminUnlocked =
-    state.admin?.isUnlocked === true && Boolean(state.adminToken);
+    state.admin?.isUnlocked === true;
   const settingsTab = $("settings-tab");
   settingsTab.hidden = !adminUnlocked;
   settingsTab.style.display = adminUnlocked ? "" : "none";
@@ -203,154 +270,128 @@ const mbps = (bytes, seconds) =>
   seconds > 0 ? Math.max(0, (bytes * 8) / seconds / 1000000) : 0;
 const formatMbps = (value) =>
   Number.isFinite(value) ? value.toFixed(value >= 100 ? 1 : 2) : "0.00";
-const formatMs = (value) =>
-  Number.isFinite(value) && value > 0 ? value.toFixed(value >= 100 ? 0 : 1) : "0.0";
 
 function setLiveTrafficState(label, tone = "") {
   badge("liveTrafficState", label, tone);
 }
 
 function resetLiveTrafficValues(detail) {
-  $("liveTrafficRx").textContent = formatMbps(state.liveTraffic.download || 0);
-  $("liveTrafficTx").textContent = formatMbps(state.liveTraffic.upload || 0);
-  $("liveTrafficTotal").textContent = formatMs(state.liveTraffic.ping || 0);
-  $("liveTrafficPeak").textContent = formatMs(state.liveTraffic.jitter || 0);
-  $("liveTrafficAverage").textContent = state.liveTraffic.edge || "Testing";
+  $("liveTrafficRx").textContent = "0.00";
+  $("liveTrafficTx").textContent = "0.00";
+  $("liveTrafficTotal").textContent = "0.00";
+  $("liveTrafficPeak").textContent = "0.00";
+  $("liveTrafficAverage").textContent = "0.00";
   $("liveTrafficRxBar").value = 0;
   $("liveTrafficTxBar").value = 0;
   $("liveTrafficDetail").textContent = detail;
   $("liveTrafficPanel").classList.remove("has-live-traffic");
 }
 
-function stopLiveTraffic(detail = "Sign in to run the internet speed test.") {
+function stopLiveTraffic(detail = "Select a connected wired adapter to observe local traffic.") {
   clearInterval(state.liveTraffic.timer);
-  state.liveTraffic.controller?.abort();
   state.liveTraffic.timer = null;
-  state.liveTraffic.controller = null;
-  state.liveTraffic.running = false;
+  state.liveTraffic.adapterId = "";
+  state.liveTraffic.previous = null;
+  state.liveTraffic.samples = [];
   state.liveTraffic.busy = false;
-  setLiveTrafficState(state.signedIn ? "Stopped" : "Waiting for sign-in");
+  setLiveTrafficState("Waiting for adapter");
   resetLiveTrafficValues(detail);
 }
 
-function renderSpeedTest(detail) {
-  const scale = Math.max(10, state.liveTraffic.download, state.liveTraffic.upload);
-  $("liveTrafficRx").textContent = formatMbps(state.liveTraffic.download);
-  $("liveTrafficTx").textContent = formatMbps(state.liveTraffic.upload);
-  $("liveTrafficTotal").textContent = formatMs(state.liveTraffic.ping);
-  $("liveTrafficPeak").textContent = formatMs(state.liveTraffic.jitter);
-  $("liveTrafficAverage").textContent = state.liveTraffic.edge || "Cloudflare";
-  $("liveTrafficRxBar").value = Math.min(100, (state.liveTraffic.download / scale) * 100);
-  $("liveTrafficTxBar").value = Math.min(100, (state.liveTraffic.upload / scale) * 100);
-  $("liveTrafficDetail").textContent = detail;
+function renderLiveTrafficSample(sample) {
+  const peak = state.liveTraffic.samples.reduce(
+    (highest, item) => Math.max(highest, item.total),
+    sample.total,
+  );
+  const average =
+    state.liveTraffic.samples.reduce((sum, item) => sum + item.total, 0) /
+    Math.max(1, state.liveTraffic.samples.length);
+  const scale = Math.max(1, peak);
+  $("liveTrafficRx").textContent = formatMbps(sample.rx);
+  $("liveTrafficTx").textContent = formatMbps(sample.tx);
+  $("liveTrafficTotal").textContent = formatMbps(sample.total);
+  $("liveTrafficPeak").textContent = formatMbps(peak);
+  $("liveTrafficAverage").textContent = formatMbps(average);
+  $("liveTrafficRxBar").value = Math.min(100, (sample.rx / scale) * 100);
+  $("liveTrafficTxBar").value = Math.min(100, (sample.tx / scale) * 100);
+  $("liveTrafficDetail").textContent =
+    "60-second rolling window from local adapter byte counters only.";
   $("liveTrafficPanel").classList.add("has-live-traffic");
 }
 
-async function speedFetch(url, options = {}) {
-  const response = await fetch(url, {
-    cache: "no-store",
-    mode: "cors",
-    ...options,
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response;
-}
-
-async function measurePing(signal) {
-  const samples = [];
-  for (let i = 0; i < 5; i++) {
-    const start = performance.now();
-    await speedFetch(`${speedTestBase}/__down?bytes=0&r=${Date.now()}-${i}`, { signal });
-    samples.push(performance.now() - start);
+function liveTrafficUnavailableMessage(error) {
+  const message = error?.message || "";
+  if (
+    message.includes("HTTP 404") ||
+    message.includes("Traffic counters are unavailable")
+  ) {
+    return "Local traffic counters are not available for this adapter yet. JackPeek is still passive; no switch query or test traffic was sent.";
   }
-  samples.sort((a, b) => a - b);
-  const ping = samples[Math.floor(samples.length / 2)] || 0;
-  const jitter =
-    samples.slice(1).reduce((sum, sample, index) => sum + Math.abs(sample - samples[index]), 0) /
-    Math.max(1, samples.length - 1);
-  return { ping, jitter };
+  return message;
 }
 
-async function measureDownload(signal) {
-  const sizes = [500000, 2000000, 5000000, 10000000];
-  let best = 0;
-  for (const bytes of sizes) {
-    const start = performance.now();
-    const response = await speedFetch(`${speedTestBase}/__down?bytes=${bytes}&r=${Date.now()}`, { signal });
-    await response.arrayBuffer();
-    const speed = mbps(bytes, (performance.now() - start) / 1000);
-    best = Math.max(best, speed);
-    state.liveTraffic.download = best;
-    renderSpeedTest("Measuring download throughput.");
+async function pollLiveTraffic() {
+  const adapter = selectedAdapter();
+  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
+    stopLiveTraffic();
+    return;
   }
-  return best;
-}
-
-async function measureUpload(signal) {
-  const sizes = [250000, 1000000, 3000000, 5000000];
-  let best = 0;
-  for (const bytes of sizes) {
-    const payload = new Uint8Array(bytes);
-    crypto.getRandomValues(payload.subarray(0, Math.min(bytes, 65536)));
-    const start = performance.now();
-    await speedFetch(`${speedTestBase}/__up?r=${Date.now()}`, {
-      method: "POST",
-      body: payload,
-      signal,
-    });
-    const speed = mbps(bytes, (performance.now() - start) / 1000);
-    best = Math.max(best, speed);
-    state.liveTraffic.upload = best;
-    renderSpeedTest("Measuring upload throughput.");
-  }
-  return best;
-}
-
-async function detectSpeedEdge(signal) {
+  if (state.liveTraffic.busy) return;
+  state.liveTraffic.busy = true;
   try {
-    const response = await speedFetch(`${speedTestBase}/cdn-cgi/trace?r=${Date.now()}`, { signal });
-    const trace = await response.text();
-    const colo = trace.match(/^colo=(.+)$/m)?.[1]?.trim();
-    if (colo) return colo;
-  } catch {
-    return "Cloudflare";
-  }
-  return "Cloudflare";
-}
-
-async function startLiveTraffic(force = false) {
-  if (!state.signedIn || state.liveTraffic.running) return;
-  if (state.liveTraffic.started && !force) return;
-  state.liveTraffic.started = true;
-  state.liveTraffic.running = true;
-  state.liveTraffic.controller?.abort();
-  state.liveTraffic.controller = new AbortController();
-  state.liveTraffic.download = 0;
-  state.liveTraffic.upload = 0;
-  state.liveTraffic.ping = 0;
-  state.liveTraffic.jitter = 0;
-  state.liveTraffic.edge = "Testing";
-  setLiveTrafficState("Testing", "warning");
-  renderSpeedTest("Finding the nearest reachable Cloudflare edge.");
-  try {
-    const signal = state.liveTraffic.controller.signal;
-    state.liveTraffic.edge = await detectSpeedEdge(signal);
-    const latency = await measurePing(signal);
-    state.liveTraffic.ping = latency.ping;
-    state.liveTraffic.jitter = latency.jitter;
-    renderSpeedTest("Latency measured. Measuring download throughput.");
-    await measureDownload(signal);
-    renderSpeedTest("Download measured. Measuring upload throughput.");
-    await measureUpload(signal);
-    setLiveTrafficState("Complete", "success");
-    renderSpeedTest("Speed test complete. Results are from standard HTTPS requests to Cloudflare.");
+    const snapshot = await request(
+      `/api/adapters/${encodeURIComponent(adapter.id)}/traffic`,
+    );
+    if (state.liveTraffic.adapterId !== adapter.id) return;
+    const previous = state.liveTraffic.previous;
+    state.liveTraffic.previous = snapshot;
+    if (!previous) {
+      setLiveTrafficState("Priming counters", "warning");
+      resetLiveTrafficValues(
+        "Reading the first local counter sample. Live rates appear on the next tick.",
+      );
+      return;
+    }
+    const seconds =
+      (Date.parse(snapshot.capturedAt) - Date.parse(previous.capturedAt)) / 1000;
+    const rx = mbps(snapshot.bytesReceived - previous.bytesReceived, seconds);
+    const tx = mbps(snapshot.bytesSent - previous.bytesSent, seconds);
+    const sample = { rx, tx, total: rx + tx };
+    state.liveTraffic.samples.push(sample);
+    state.liveTraffic.samples = state.liveTraffic.samples.slice(-60);
+    renderLiveTrafficSample(sample);
+    setLiveTrafficState("Live", "success");
   } catch (error) {
-    if (error?.name === "AbortError") return;
-    setLiveTrafficState("Unavailable", "warning");
-    $("liveTrafficDetail").textContent =
-      "The external speed test could not reach Cloudflare from this workstation or browser session.";
+    setLiveTrafficState("Counters unavailable", "warning");
+    resetLiveTrafficValues(liveTrafficUnavailableMessage(error));
   } finally {
-    state.liveTraffic.running = false;
+    state.liveTraffic.busy = false;
+  }
+}
+
+function startLiveTraffic() {
+  const adapter = selectedAdapter();
+  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
+    stopLiveTraffic();
+    return;
+  }
+  if (state.liveTraffic.adapterId !== adapter.id) {
+    clearInterval(state.liveTraffic.timer);
+    state.liveTraffic = {
+      timer: null,
+      adapterId: adapter.id,
+      previous: null,
+      samples: [],
+      busy: false,
+    };
+    setLiveTrafficState("Starting", "warning");
+    resetLiveTrafficValues(
+      "Reading only local Windows counters for the selected wired adapter.",
+    );
+  }
+  if (!state.liveTraffic.timer) {
+    void pollLiveTraffic();
+    state.liveTraffic.timer = setInterval(pollLiveTraffic, 1000);
   }
 }
 
@@ -404,6 +445,7 @@ function hideAdminPasswordDialog() {
 }
 
 function showAuthScreen(id) {
+  window.JackPeekTechnicalReview?.clear();
   document.querySelectorAll(".auth-screen").forEach((screen) => {
     screen.hidden = screen.id !== id;
   });
@@ -521,7 +563,7 @@ async function signOut() {
 function showTab(name, updateUrl = true) {
   if (
     name === "settings" &&
-    !(state.admin?.isUnlocked === true && Boolean(state.adminToken))
+    !(state.admin?.isUnlocked === true)
   )
     name = "capture";
   if (
@@ -608,10 +650,24 @@ function adapterStatusLabel(adapter) {
   return adapter.captureAvailable ? "Ready" : "Driver missing";
 }
 
+function adapterDescription(adapter) {
+  const name = String(adapter?.name || "").trim();
+  const description = String(adapter?.description || "").trim();
+  return description && description.localeCompare(name, undefined, { sensitivity: "accent" }) !== 0
+    ? description
+    : "";
+}
+
+function adapterDisplayName(adapter) {
+  if (!adapter) return "";
+  const description = adapterDescription(adapter);
+  return description ? `${adapter.name} · ${description}` : adapter.name;
+}
+
 function renderAdapterMenu() {
   const selected = selectedAdapter();
   $("adapterMenuLabel").textContent = selected
-    ? `${selected.name} · ${selected.description}`
+    ? adapterDisplayName(selected)
     : state.adapters.length
       ? "Select Ethernet adapter"
       : "No wired adapter detected";
@@ -623,7 +679,8 @@ function renderAdapterMenu() {
             adapter.operationalStatus === "Up" && adapter.captureAvailable
               ? "success"
               : "warning";
-          return `<button class="adapter-menu-option" type="button" role="option" aria-selected="${active}" data-adapter-id="${escapeHtml(adapter.id)}"><span><strong>${escapeHtml(adapter.name)}</strong><small>${escapeHtml(adapter.description)}</small></span><span class="badge ${tone}">${escapeHtml(adapterStatusLabel(adapter))}</span></button>`;
+          const description = adapterDescription(adapter);
+          return `<button class="adapter-menu-option" type="button" role="option" aria-selected="${active}" data-adapter-id="${escapeHtml(adapter.id)}"><span><strong>${escapeHtml(adapter.name)}</strong>${description ? `<small>${escapeHtml(description)}</small>` : ""}</span><span class="badge ${tone}">${escapeHtml(adapterStatusLabel(adapter))}</span></button>`;
         })
         .join("")
     : '<p class="adapter-menu-empty">No wired Ethernet adapters detected.</p>';
@@ -652,10 +709,11 @@ function selectAdapter(id) {
 
 function updateAdapter() {
   const adapter = selectedAdapter();
+  const description = adapterDescription(adapter);
   $("adapterName").textContent = adapter?.name || "No wired Ethernet adapter";
-  $("adapterDescription").textContent =
-    adapter?.description ||
-    "Connect a physical Ethernet adapter, then refresh.";
+  $("adapterDescription").textContent = description ||
+    (adapter ? "" : "Connect a physical Ethernet adapter, then refresh.");
+  $("adapterDescription").hidden = Boolean(adapter && !description);
   $("adapterMac").textContent = adapter?.macAddress || "Not available";
   $("adapterIps").textContent = adapter?.ipAddresses?.length
     ? adapter.ipAddresses.join(" · ")
@@ -748,7 +806,7 @@ async function loadAdapters() {
     $("adapterSelect").replaceChildren(
       ...adapters.map(
         (adapter) =>
-          new Option(`${adapter.name} · ${adapter.description}`, adapter.id),
+          new Option(adapterDisplayName(adapter), adapter.id),
       ),
     );
     if (!adapters.length)
@@ -1153,8 +1211,10 @@ function renderAdminWorkspace() {
   renderSwitchInventory();
 }
 function showAdminTab(name) {
-  if (!["accounts", "general", "reviews", "inventory"].includes(name)) name = "accounts";
+  if (!["accounts", "general", "reviews", "inventory", "technical"].includes(name)) name = "accounts";
   state.activeAdminTab = name;
+  if (name === "inventory") renderSwitchInventory();
+  if (name === "technical") window.JackPeekTechnicalReview?.load();
   document.querySelectorAll("[data-admin-tab]").forEach((tab) => {
     const active = tab.dataset.adminTab === name;
     tab.classList.toggle("active", active);
@@ -1230,12 +1290,12 @@ function renderSwitchInventory() {
     const latest = reports[0];
     const score = latest?.priorReviewFound ? Number(latest.priorReviewMatchScore || 0) : 0;
     const status = !latest?.priorReviewFound ? { key: "new", label: "New identity", tone: "warning" } : latest.adminReviewRequired ? { key: "review", label: "Requires review", tone: "warning" } : score === 3 ? { key: "confirmed", label: "Identity confirmed", tone: "success" } : { key: "updated", label: "Identity updated", tone: "info" };
-    const searchable = [...group.names, ...group.ips, ...group.macs, ...group.ports, ...group.vlans, ...group.reports.flatMap((report) => [report.deviceName, report.model, report.platform])].filter(Boolean).join(" ").toLocaleLowerCase();
+    const searchable = [...group.names, ...group.ips, ...group.macs, ...group.ports, ...group.vlans, ...reports.flatMap((report) => [report.deviceName, report.model, report.platform])].filter(Boolean).join(" ").toLocaleLowerCase();
     const changed = group.changes.length > 0 || status.key === "updated";
     const reviewPending = group.reviewPending || status.key === "review";
     return { ...group, latest, reports, status, changed, reviewPending, searchable, label: [...group.names][0] || [...group.macs][0] || "Unidentified switch" };
   }).filter((group) => (!search || group.searchable.includes(search)) && (statusFilter === "all" || group.status.key === statusFilter) && (!changesOnly || group.changed) && (!pendingOnly || group.reviewPending)).sort((a, b) => Date.parse(b.latest?.createdAt || 0) - Date.parse(a.latest?.createdAt || 0));
-  $("inventoryCount").textContent = plural(inventory.length, "switch");
+  $("inventoryCount").textContent = plural(inventory.length, "switch", "switches");
   if (!inventory.length) {
     $("switchInventory").innerHTML = empty("No switches in inventory", "Completed passive reviews will appear here after they are saved.");
     return;
@@ -1591,7 +1651,7 @@ async function unlockAdminFromPortal(event) {
       state.admin.isConfigured = true;
     }
     const result = await post("/api/admin/unlock", { password });
-    state.adminToken = result.token || "";
+    state.adminToken = "";
     state.admin = { isConfigured: true, isUnlocked: true };
     updateSettingsTabVisibility();
     $("adminPortalPasswordInput").value = "";
@@ -1787,6 +1847,35 @@ function selectHistoryFilterValue(type, value) {
   input.value = value;
   closeHistoryFilterMenu(type);
   renderReports();
+}
+
+function setupResponsiveFilters(toggleId, panelId) {
+  const toggle = $(toggleId);
+  const panel = $(panelId);
+  if (!toggle || !panel) return;
+
+  const compactLayout = window.matchMedia("(max-width: 1180px)");
+  let expanded = !compactLayout.matches;
+
+  const render = () => {
+    const collapsible = compactLayout.matches;
+    toggle.hidden = !collapsible;
+    panel.hidden = collapsible && !expanded;
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+    toggle.classList.toggle("active", collapsible && expanded);
+  };
+
+  toggle.addEventListener("click", () => {
+    expanded = !expanded;
+    render();
+  });
+
+  const resetForViewport = () => {
+    expanded = !compactLayout.matches;
+    render();
+  };
+  compactLayout.addEventListener?.("change", resetForViewport);
+  render();
 }
 
 function renderReports() {
@@ -2076,6 +2165,8 @@ $("reportFilter").addEventListener("change", renderReports);
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".history-combobox")) closeHistoryFilterMenus();
 });
+setupResponsiveFilters("historyFiltersToggle", "historyFilters");
+setupResponsiveFilters("inventoryFiltersToggle", "inventoryFilters");
 $("timelineStatusFilter")?.addEventListener("change", renderReports);
 $("reports").addEventListener("click", (event) => {
   const button = event.target.closest("[data-report]");

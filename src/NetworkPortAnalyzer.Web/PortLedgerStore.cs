@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Runtime.Versioning;
 using NetworkPortAnalyzer.Core;
 
 namespace NetworkPortAnalyzer.Web;
@@ -11,10 +13,12 @@ public sealed class PortLedgerStore
     };
 
     private readonly Func<EvidenceSettings> _settings;
+    private readonly EvidenceStore? _evidence;
 
     public PortLedgerStore(EvidenceStore evidence)
     {
         _settings = evidence.GetSettings;
+        _evidence = evidence;
     }
 
     internal PortLedgerStore(Func<EvidenceSettings> settings)
@@ -25,6 +29,10 @@ public sealed class PortLedgerStore
     public PortLedgerSaveResult Save(EvidenceRecord record)
     {
         var settings = _settings();
+        // In NAS-primary mode the evidence is the source of truth. Derive ledger
+        // views in memory so an offline capture does not leave a plaintext copy.
+        if (settings.StorageMode == EvidenceStore.StorageNasOnlyWithCache)
+            return new PortLedgerSaveResult(0, 0);
         var localRoot = Path.Combine(settings.LocalHistoryPath, "PortLedger");
         Directory.CreateDirectory(localRoot);
 
@@ -38,8 +46,9 @@ public sealed class PortLedgerStore
         {
             var fileName = $"{entry.ScannedAt:yyyyMMdd-HHmmss}-{entry.LedgerId}.json";
             var localPath = Path.Combine(localRoot, fileName);
+            if (settings.RequireEvidenceEncryption) localPath += ".dpapi";
             var stored = entry with { LocalJsonPath = localPath };
-            File.WriteAllText(localPath, JsonSerializer.Serialize(stored, JsonOptions));
+            WriteEntry(localPath, stored, settings);
 
             if (mirrorRoot is null)
             {
@@ -50,10 +59,9 @@ public sealed class PortLedgerStore
             {
                 Directory.CreateDirectory(mirrorRoot);
                 var mirrorPath = Path.Combine(mirrorRoot, fileName);
-                File.Copy(localPath, mirrorPath, true);
                 stored = stored with { MirrorJsonPath = mirrorPath };
-                File.WriteAllText(localPath, JsonSerializer.Serialize(stored, JsonOptions));
-                File.Copy(localPath, mirrorPath, true);
+                WriteEntry(localPath, stored, settings);
+                WriteEntry(mirrorPath, stored, settings);
             }
             catch
             {
@@ -139,6 +147,10 @@ public sealed class PortLedgerStore
     {
         archiveUnavailable = false;
         var settings = _settings();
+        if (settings.StorageMode == EvidenceStore.StorageNasOnlyWithCache && _evidence is not null)
+            return _evidence.ListReports().Select(summary => _evidence.TryReadRecord(summary.EvidenceId))
+                .Where(record => record is not null && _evidence.Verify(record))
+                .SelectMany(record => BuildEntries(record!)).OrderBy(entry => entry.ScannedAt).ToArray();
         var roots = new List<(string Path, bool Archive)> { (Path.Combine(settings.LocalHistoryPath, "PortLedger"), false) };
         if (settings.AllowNasMirror && !string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath))
             roots.Add((Path.Combine(settings.ArchiveMirrorPath, "PortLedger"), true));
@@ -147,7 +159,8 @@ public sealed class PortLedgerStore
         {
             try
             {
-                foreach (var path in Directory.EnumerateFiles(root.Path, "*.json"))
+                foreach (var path in Directory.EnumerateFiles(root.Path, "*.json*")
+                    .Where(p => p.EndsWith(".json") || p.EndsWith(".json.dpapi")))
                     if (TryRead(path) is { } entry) rows.Add(entry);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -213,7 +226,6 @@ public sealed class PortLedgerStore
         {
             yield return change;
         }
-        if (!previous.Protocols.Order().SequenceEqual(current.Protocols.Order()))
         foreach (var change in CompareText("Capabilities", string.Join(", ", previous.Capabilities), string.Join(", ", current.Capabilities)))
         {
             yield return change;
@@ -234,7 +246,14 @@ public sealed class PortLedgerStore
     {
         try
         {
-            return JsonSerializer.Deserialize<PortLedgerEntry>(File.ReadAllText(path), JsonOptions);
+            if (new FileInfo(path).Length > 1024 * 1024) return null;
+            var bytes = File.ReadAllBytes(path);
+            if (path.EndsWith(".dpapi", StringComparison.OrdinalIgnoreCase))
+            {
+                bytes = TryUnprotect(bytes)
+                    ?? throw new CryptographicException("Port ledger decryption failed.");
+            }
+            return JsonSerializer.Deserialize<PortLedgerEntry>(bytes, JsonOptions);
         }
         catch
         {
@@ -244,6 +263,39 @@ public sealed class PortLedgerStore
 
     private static string NormalizeIdentity(string? switchIdentity, string? port) =>
         $"{PortSnapshots.NormalizeSwitch(switchIdentity)}|{PortSnapshots.NormalizePort(port)}";
+
+    private static void WriteEntry(string path, PortLedgerEntry entry, EvidenceSettings settings)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(entry, JsonOptions);
+        if (path.EndsWith(".dpapi", StringComparison.OrdinalIgnoreCase))
+            bytes = ProtectWithDpapi(bytes, settings.AdminManagedCacheEncryption);
+        var temporary = path + "." + Guid.NewGuid().ToString("n") + ".tmp";
+        try { File.WriteAllBytes(temporary, bytes); File.Move(temporary, path, true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    private static byte[]? TryUnprotect(byte[] bytes)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try { return UnprotectWithDpapi(bytes, DataProtectionScope.LocalMachine); }
+        catch (CryptographicException) { return UnprotectWithDpapi(bytes, DataProtectionScope.CurrentUser); }
+    }
+
+    private static byte[] ProtectWithDpapi(byte[] bytes, bool useMachineScope)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("DPAPI port ledger encryption is available only on Windows.");
+#pragma warning disable CA1416
+        return ProtectedData.Protect(bytes, null, useMachineScope ? DataProtectionScope.LocalMachine : DataProtectionScope.CurrentUser);
+#pragma warning restore CA1416
+    }
+
+    private static byte[] UnprotectWithDpapi(byte[] bytes, DataProtectionScope scope)
+    {
+#pragma warning disable CA1416
+        return ProtectedData.Unprotect(bytes, null, scope);
+#pragma warning restore CA1416
+    }
 
     private static int IdentityMatchScore(PortLedgerEntry current, PortLedgerEntry previous)
     {

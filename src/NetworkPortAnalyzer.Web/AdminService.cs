@@ -7,9 +7,6 @@ namespace NetworkPortAnalyzer.Web;
 
 public sealed class AdminService
 {
-    // Temporary bootstrap credential for first-run local installations.
-    // Only its salted PBKDF2 hash is persisted.
-    public const string DefaultAdminPassword = "N3t@P3k842!";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -17,22 +14,22 @@ public sealed class AdminService
 
     private readonly ConcurrentDictionary<string, DateTimeOffset> _sessions = new();
     private readonly string _adminPath;
+    private readonly object _passwordGate = new();
 
-    public AdminService()
+    public AdminService() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "JackPeek")) { }
+
+    public AdminService(string root)
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "JackPeek");
         Directory.CreateDirectory(root);
         _adminPath = Path.Combine(root, "admin.json");
-        if (!File.Exists(_adminPath))
-        {
-            SetPassword(string.Empty, DefaultAdminPassword);
-        }
     }
 
     public AdminStatus GetStatus() => new(IsConfigured(), false);
 
     public AdminUnlockResult Unlock(string password)
     {
+        if (password is null || password.Length > 1024)
+            return new AdminUnlockResult(false, null, "Invalid admin password.");
         if (string.IsNullOrWhiteSpace(password) || !ValidatePassword(password))
         {
             return new AdminUnlockResult(false, null, "Invalid admin password.");
@@ -67,12 +64,14 @@ public sealed class AdminService
 
     public void SetPassword(string currentPassword, string newPassword)
     {
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 10)
+        lock (_passwordGate)
+        {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 10 || newPassword.Length > 1024 || currentPassword?.Length > 1024)
         {
             throw new InvalidOperationException("Admin password must be at least 10 characters.");
         }
 
-        if (IsConfigured() && !ValidatePassword(currentPassword))
+        if (IsConfigured() && !ValidatePassword(currentPassword ?? string.Empty))
         {
             throw new InvalidOperationException("Current admin password is invalid.");
         }
@@ -80,8 +79,15 @@ public sealed class AdminService
         var salt = RandomNumberGenerator.GetBytes(16);
         var hash = HashPassword(newPassword, salt);
         var state = new AdminPasswordState(Convert.ToBase64String(salt), Convert.ToBase64String(hash));
-        File.WriteAllText(_adminPath, JsonSerializer.Serialize(state, JsonOptions));
+        var temporary = _adminPath + "." + Guid.NewGuid().ToString("n") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(state, JsonOptions));
+            File.Move(temporary, _adminPath, true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
         _sessions.Clear();
+        }
     }
 
     public void Lock(string? token) { if (token is not null) _sessions.TryRemove(token, out _); }
@@ -90,6 +96,7 @@ public sealed class AdminService
 
     private bool ValidatePassword(string password)
     {
+        if (password is null || password.Length > 1024) return false;
         if (!File.Exists(_adminPath))
         {
             return false;

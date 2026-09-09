@@ -11,6 +11,7 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/app.js" defer></script>
+    <script src="/technical-review.js" defer></script>
   </head>
   <body class="auth-active">
     <section
@@ -268,6 +269,12 @@
         >
           <dl class="adapter-summary">
             <div class="adapter-identity">
+              <span class="adapter-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4h14v10l-3 3H8l-3-3V4Z" />
+                  <path d="M8 8h2m2 0h2m2 0h1M9 17v3m6-3v3" />
+                </svg>
+              </span>
               <dt>Wired adapter</dt>
               <dd id="adapterName">Checking adapters</dd>
               <dd id="adapterDescription" class="subvalue">
@@ -312,18 +319,23 @@
               <div id="adapterMenu" class="adapter-menu" role="listbox" hidden></div>
             </div>
             <label class="capture-duration" for="durationInput">
-              <span>Listen time</span>
-              <input
-                id="durationInput"
-                type="number"
-                min="5"
-                max="120"
-                step="5"
-                value="30"
-                inputmode="numeric"
-                required
-              />
-              <small>seconds</small>
+              <span class="field-label">Listen time</span>
+              <span class="duration-input-row">
+                <span class="duration-input-shell">
+                  <input
+                    id="durationInput"
+                    type="number"
+                    min="5"
+                    max="120"
+                    step="5"
+                    value="30"
+                    inputmode="numeric"
+                    aria-describedby="durationUnit"
+                    required
+                  />
+                  <small id="durationUnit">secs</small>
+                </span>
+              </span>
             </label>
             <button id="scanBtn" class="button primary capture-action" type="submit" disabled>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -393,34 +405,34 @@
         <section
           id="liveTrafficPanel"
           class="panel live-traffic-panel"
-          aria-label="Internet speed test"
+          aria-label="Observed workstation traffic"
         >
           <div class="live-traffic-heading">
             <div>
-              <span class="workspace-label">Internet path test</span>
-              <h2>Speed Test</h2>
+              <span class="workspace-label">Local adapter counters</span>
+              <h2>Observed traffic</h2>
             </div>
-            <span id="liveTrafficState" class="badge">Waiting for sign-in</span>
+            <span id="liveTrafficState" class="badge">Waiting for adapter</span>
           </div>
           <dl class="live-traffic-grid">
             <div>
-              <dt>Download Mbps <button class="info-tip" type="button" title="HTTP download throughput measured against Cloudflare's nearest reachable edge." aria-label="What is download Mbps?">?</button></dt>
+              <dt>RX Mbps <button class="info-tip" type="button" title="Data received by the selected Windows adapter. JackPeek reads the local byte counter and sends no test traffic." aria-label="What is RX Mbps?">?</button></dt>
               <dd id="liveTrafficRx" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Upload Mbps <button class="info-tip" type="button" title="HTTP upload throughput measured against Cloudflare's nearest reachable edge." aria-label="What is upload Mbps?">?</button></dt>
+              <dt>TX Mbps <button class="info-tip" type="button" title="Data sent by the selected Windows adapter. This includes existing workstation traffic only." aria-label="What is TX Mbps?">?</button></dt>
               <dd id="liveTrafficTx" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Ping ms <button class="info-tip" type="button" title="Idle HTTP latency to the selected test edge." aria-label="What is ping?">?</button></dt>
+              <dt>Total Mbps <button class="info-tip" type="button" title="Combined receive and transmit rate from the local Windows adapter counters." aria-label="What is total Mbps?">?</button></dt>
               <dd id="liveTrafficTotal" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Jitter ms <button class="info-tip" type="button" title="Average variation between latency samples." aria-label="What is jitter?">?</button></dt>
+              <dt>Peak Mbps <button class="info-tip" type="button" title="Highest combined rate observed during the current 60-second local window." aria-label="What is peak Mbps?">?</button></dt>
               <dd id="liveTrafficPeak" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Edge <button class="info-tip" type="button" title="Nearest Cloudflare edge when the public trace endpoint is reachable." aria-label="What is edge?">?</button></dt>
+              <dt>60s average <button class="info-tip" type="button" title="Average combined rate from the recent local counter samples." aria-label="What is the 60-second average?">?</button></dt>
               <dd id="liveTrafficAverage" class="metric-value">0.00</dd>
             </div>
           </dl>
@@ -429,10 +441,10 @@
             <div><span>Up</span><progress id="liveTrafficTxBar" value="0" max="100"></progress></div>
           </div>
           <p id="liveTrafficDetail" class="comparison-note">
-            Runs automatically after sign-in using standard HTTPS requests.
+            Select a connected wired adapter to observe local counters.
           </p>
           <p class="live-traffic-footnote">
-            External speed test, not switch-port counters.
+            Passive display only. JackPeek does not generate traffic for these readings.
           </p>
         </section>
         <div id="lastEvidence" class="evidence-strip" hidden></div>
@@ -466,11 +478,21 @@
                 type="search"
                 placeholder="Device, port, workstation, or evidence ID"
                 autocomplete="off" /></label
-            ><span id="reportCount" class="secondary-text"
-              >Loading reports</span
-            >
+            ><div class="filter-toolbar-actions">
+              <span id="reportCount" class="secondary-text"
+                >Loading reports</span
+              ><button
+                id="historyFiltersToggle"
+                class="button secondary filter-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="historyFilters"
+              >
+                <span>Filters</span><span class="filter-toggle-chevron" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
-          <div class="history-filters" aria-label="Evidence filters">
+          <div id="historyFilters" class="history-filters" aria-label="Evidence filters">
             <label class="filter-field">Show<select id="reportFilter">
               <option value="all">All evidence</option>
               <option value="success">Successful captures</option>
@@ -613,8 +635,25 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="5" rx="1"/><rect x="4" y="14" width="16" height="5" rx="1"/><path d="M8 7.5h.01M8 16.5h.01"/></svg>
                 Switch inventory
               </button>
+              <button id="technical-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="technical-panel" tabindex="-1" data-admin-tab="technical">
+                Technical Review
+              </button>
             </div>
           </div>
+          <section id="technical-panel" class="admin-panel technical-review" role="tabpanel" aria-labelledby="technical-tab" data-admin-panel="technical" hidden>
+            <div class="technical-heading">
+              <div><span class="workspace-label">Application assessment</span><h3>Technical Review</h3><p id="technicalBuild">Loading reviewed build...</p></div>
+              <button id="exportTechnicalReview" class="button secondary" type="button">Export Technical Review</button>
+            </div>
+            <div id="technicalCapabilities" class="technical-capabilities" aria-label="Verified capabilities"></div>
+            <p class="technical-assessment">Conditional evaluation. Open security and deployment risks remain.</p>
+            <div class="technical-toolbar">
+              <label for="technicalSearch">Find a topic<input id="technicalSearch" type="search" placeholder="Network, cookies, NAS, permissions..." autocomplete="off" /></label>
+              <button id="refreshTechnicalReview" class="button secondary" type="button">Refresh review</button>
+            </div>
+            <p id="technicalStatus" role="status" aria-live="polite"></p>
+            <div id="technicalSections"></div>
+          </section>
           <section id="inventory-panel" class="admin-panel" role="tabpanel" aria-labelledby="inventory-tab" data-admin-panel="inventory" hidden>
             <div class="review-center-header">
               <div><span class="workspace-label">Infrastructure inventory</span><h3>Switch inventory</h3><p>Local inventory built only from passive evidence and PortLedger records.</p></div>
@@ -622,9 +661,20 @@
             </div>
             <div class="directory-toolbar inventory-toolbar">
               <label class="search-label">Find a switch<input id="inventorySearch" type="search" placeholder="Name, IP, MAC, model, or port" autocomplete="off" /></label>
-              <label>Status<select id="inventoryStatusFilter"><option value="all">All states</option><option value="confirmed">Identity confirmed</option><option value="updated">Identity updated</option><option value="review">Requires review</option><option value="new">New identity</option></select></label>
-              <label class="inventory-check-filter"><input id="inventoryChangesFilter" type="checkbox" /> Has recent changes</label>
-              <label class="inventory-check-filter"><input id="inventoryPendingFilter" type="checkbox" /> Review pending</label>
+              <button
+                id="inventoryFiltersToggle"
+                class="button secondary filter-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="inventoryFilters"
+              >
+                <span>Filters</span><span class="filter-toggle-chevron" aria-hidden="true"></span>
+              </button>
+              <div id="inventoryFilters" class="inventory-filter-options" aria-label="Inventory filters">
+                <label>Status<select id="inventoryStatusFilter"><option value="all">All states</option><option value="confirmed">Identity confirmed</option><option value="updated">Identity updated</option><option value="review">Requires review</option><option value="new">New identity</option></select></label>
+                <label class="inventory-check-filter"><input id="inventoryChangesFilter" type="checkbox" /> Has recent changes</label>
+                <label class="inventory-check-filter"><input id="inventoryPendingFilter" type="checkbox" /> Review pending</label>
+              </div>
             </div>
             <div id="switchInventory" class="switch-inventory" aria-live="polite"></div>
           </section>
