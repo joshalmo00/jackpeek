@@ -384,6 +384,16 @@
               >Loading reports</span
             >
           </div>
+          <div class="history-filters" aria-label="Evidence filters">
+            <label>Show<select id="reportFilter">
+              <option value="all">All evidence</option>
+              <option value="success">Successful captures</option>
+              <option value="empty">No advertisements</option>
+              <option value="error">With errors</option>
+              <option value="pending">Pending NAS sync</option>
+              <option value="review">Admin review required</option>
+            </select></label>
+          </div>
           <p id="historyStatus" class="inline-status" role="status"></p>
           <div id="reports" class="table-scroll"></div>
         </div>

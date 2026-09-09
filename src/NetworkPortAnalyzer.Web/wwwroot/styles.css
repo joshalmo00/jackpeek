@@ -2683,3 +2683,68 @@ body.auth-active a {
 body.auth-active .denied-icon {
   background: rgba(255, 99, 112, 0.12);
 }
+
+body:not(.auth-active) .history-filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 0 20px 18px;
+  border-bottom: 1px solid #183a58;
+}
+body:not(.auth-active) .history-filters label {
+  width: min(100%, 250px);
+}
+body:not(.auth-active) .history-filters select {
+  min-height: 36px;
+}
+body:not(.auth-active) .result-group + .result-group {
+  border-top: 1px solid #183a58;
+}
+body:not(.auth-active) .result-group h4 {
+  margin: 0;
+  padding: 12px 18px 7px;
+  color: #6dc8f4;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+body:not(.auth-active) .result-group .port-values {
+  background: transparent;
+}
+body:not(.auth-active) .port-value {
+  border-bottom-color: #183a58;
+}
+body:not(.auth-active) .port-value dd {
+  color: #f4f9fc;
+  overflow-wrap: anywhere;
+}
+body:not(.auth-active) .port-value dt {
+  color: #86a9c8;
+}
+body:not(.auth-active) .port-card-heading {
+  background: #0a2137;
+  border-bottom-color: #1a4a70;
+}
+body:not(.auth-active) .result-state {
+  color: #a8bfd3;
+}
+body:not(.auth-active) .result-state-success {
+  color: #12e6a5;
+}
+body:not(.auth-active) .history-review {
+  color: #ffb45b;
+}
+@media (max-width: 640px) {
+  body:not(.auth-active) .history-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  body:not(.auth-active) .history-toolbar .search-label,
+  body:not(.auth-active) .history-filters label {
+    width: 100%;
+  }
+  body:not(.auth-active) .history-filters {
+    padding-inline: 16px;
+  }
+}

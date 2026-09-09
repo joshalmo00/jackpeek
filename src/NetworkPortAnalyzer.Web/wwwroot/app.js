@@ -6,6 +6,7 @@ const state = {
   settings: null,
   license: null,
   reports: [],
+  reportFilter: "all",
   result: null,
   ports: [],
   selectedPort: 0,
@@ -687,16 +688,22 @@ function renderPortComparison() {
   const differences = history
     ? portFields.filter(([key]) => changedField(key, history.port, current))
     : [];
+  const groups = [
+    ["Switch identity", ["switchName", "switchMac", "switchIp"]],
+    ["Port", ["port", "portDescription", "capabilities"]],
+    ["Network", ["nativeVlan", "voiceVlan", "duplex"]],
+  ];
   const card = (port, title, subtitle) =>
-    `<section class="port-card" aria-label="${escapeHtml(title)}"><div class="port-card-heading"><span class="badge">${escapeHtml(title)}</span><p>${escapeHtml(subtitle)}</p></div><dl class="port-values">${portFields
-      .map(([key, label]) => {
+    `<section class="port-card" aria-label="${escapeHtml(title)}"><div class="port-card-heading"><span class="badge">${escapeHtml(title)}</span><p>${escapeHtml(subtitle)}</p></div>${groups
+      .map(([groupTitle, keys]) => `<div class="result-group"><h4>${escapeHtml(groupTitle)}</h4><dl class="port-values">${keys
+      .map((key) => {
+        const label = portFields.find(([fieldKey]) => fieldKey === key)?.[1] || key;
         const value = port[key];
         const changed = history && changedField(key, history.port, current);
         return `<div class="port-value ${changed ? "value-changed" : ""}"><dt>${escapeHtml(label)}${changed ? '<span class="change-marker">Changed</span>' : ""}</dt><dd>${escapeHtml(knownValue(value) ? (Array.isArray(value) ? value.join(", ") : value) : "Not observed")}</dd></div>`;
       })
-      .join(
-        "",
-      )}</dl>${port.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertised values</strong><ul>${port.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}</section>`;
+      .join("")}</dl></div>`)
+      .join("")}${port.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertised values</strong><ul>${port.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}</section>`;
   const selector =
     state.ports.length > 1
       ? `<label class="port-selector">Captured switch port<select id="capturedPortSelect">${state.ports.map((port, i) => `<option value="${i}" ${i === state.selectedPort ? "selected" : ""}>${escapeHtml(port.switchName || port.chassisId || "Unnamed switch")} · ${escapeHtml(port.port || "Unknown port")}</option>`).join("")}</select></label>`
@@ -1162,19 +1169,34 @@ async function loadReports() {
 
 function renderReports() {
   const query = $("reportSearch").value.trim().toLocaleLowerCase();
-  const reports = state.reports.filter((r) =>
-    [
+  const filter = $("reportFilter")?.value || "all";
+  state.reportFilter = filter;
+  const reports = state.reports.filter((r) => {
+    const isEmpty = Number(r.observations || 0) === 0;
+    const hasError = Boolean(r.error || r.status === "error");
+    const pending = ["pending-nas-sync", "pending"].includes(r.storageState);
+    const needsReview = Boolean(r.adminReviewRequired);
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "success" && !isEmpty && !hasError) ||
+      (filter === "empty" && isEmpty) ||
+      (filter === "error" && hasError) ||
+      (filter === "pending" && pending) ||
+      (filter === "review" && needsReview);
+    return matchesFilter && [
       r.deviceName,
       r.switchPort,
       r.machineName,
+      r.storageState,
+      r.adminReviewReason,
       r.evidenceId,
       formatDate(r.createdAt),
     ].some((v) =>
       String(v || "")
         .toLocaleLowerCase()
         .includes(query),
-    ),
-  );
+    );
+  });
   $("reportCount").textContent = query
     ? `${reports.length} of ${plural(state.reports.length, "report")}`
     : plural(reports.length, "report");
@@ -1188,7 +1210,13 @@ function renderReports() {
     return;
   }
   $("reports").innerHTML =
-    `<table><caption class="sr-only">Saved capture evidence</caption><thead><tr><th scope="col">Device / port</th><th scope="col">Captured</th><th scope="col">Workstation</th><th scope="col">Observations</th><th scope="col">Report</th></tr></thead><tbody>${reports.map((r) => `<tr class="${r.evidenceId === state.selectedReport?.evidenceId ? "selected-row" : ""}"><td><strong>${escapeHtml(r.deviceName || "No neighbor observed")}</strong><small class="mono">${escapeHtml(r.switchPort || "Port not advertised")}</small></td><td>${escapeHtml(formatDate(r.createdAt))}</td><td>${escapeHtml(r.machineName)}</td><td>${escapeHtml(r.observations)}<small>${escapeHtml(plural(r.framesCaptured, "frame"))}</small></td><td><button class="button small" type="button" data-report="${escapeHtml(r.evidenceId)}" aria-label="Review report from ${escapeHtml(formatDate(r.createdAt))}">Review</button></td></tr>`).join("")}</tbody></table>`;
+    `<table><caption class="sr-only">Saved capture evidence</caption><thead><tr><th scope="col">Switch / port</th><th scope="col">Captured</th><th scope="col">Workstation</th><th scope="col">Result</th><th scope="col">Storage</th><th scope="col">Action</th></tr></thead><tbody>${reports.map((r) => {
+      const storage = r.storageState === "pending-nas-sync" ? "Pending NAS" : r.storageState === "nas-synced" ? "NAS synced" : "Local evidence";
+      const storageTone = r.storageState === "pending-nas-sync" ? "warning" : r.storageState === "nas-synced" ? "success" : "";
+      const result = Number(r.observations || 0) > 0 ? "Observed" : "No advertisements";
+      const review = r.adminReviewRequired ? '<small class="history-review">Admin review</small>' : "";
+      return `<tr class="${r.evidenceId === state.selectedReport?.evidenceId ? "selected-row" : ""}"><td><strong>${escapeHtml(r.deviceName || "No switch observed")}</strong><small class="mono">${escapeHtml(r.switchPort || "Port not advertised")}</small></td><td>${escapeHtml(formatDate(r.createdAt))}</td><td>${escapeHtml(r.machineName || "Not recorded")}</td><td><span class="result-state ${Number(r.observations || 0) > 0 ? "result-state-success" : ""}">${escapeHtml(result)}</span>${review}</td><td><span class="badge ${storageTone}">${escapeHtml(storage)}</span></td><td><button class="button small" type="button" data-report="${escapeHtml(r.evidenceId)}" aria-label="Review report from ${escapeHtml(formatDate(r.createdAt))}">Review</button></td></tr>`;
+    }).join("")}</tbody></table>`;
 }
 async function openReport(id) {
   const generation = ++state.reportRequest;
@@ -1305,6 +1333,7 @@ document
 $("licenseFileInput").addEventListener("change", importLicense);
 $("refreshReportsBtn").addEventListener("click", loadReports);
 $("reportSearch").addEventListener("input", renderReports);
+$("reportFilter").addEventListener("change", renderReports);
 $("reports").addEventListener("click", (event) => {
   const button = event.target.closest("[data-report]");
   if (button) void openReport(button.dataset.report);
