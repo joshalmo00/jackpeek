@@ -20,7 +20,7 @@
       <_Parameter1>NetworkPortAnalyzer.Tests</_Parameter1>
     </AssemblyAttribute>
     <None Include="app.ico" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
     <ProjectReference Include="..\NetworkPortAnalyzer.Capture\NetworkPortAnalyzer.Capture.csproj" />
     <ProjectReference Include="..\NetworkPortAnalyzer.Windows\NetworkPortAnalyzer.Windows.csproj" />
   </ItemGroup>
