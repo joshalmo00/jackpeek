@@ -311,6 +311,20 @@
               </button>
               <div id="adapterMenu" class="adapter-menu" role="listbox" hidden></div>
             </div>
+            <label class="capture-duration" for="durationInput">
+              <span>Listen time</span>
+              <input
+                id="durationInput"
+                type="number"
+                min="5"
+                max="120"
+                step="5"
+                value="30"
+                inputmode="numeric"
+                required
+              />
+              <small>seconds</small>
+            </label>
             <button id="scanBtn" class="button primary capture-action" type="submit" disabled>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 5 10 7-10 7z" /></svg
@@ -379,47 +393,46 @@
         <section
           id="liveTrafficPanel"
           class="panel live-traffic-panel"
-          aria-label="Observed workstation traffic"
+          aria-label="Internet speed test"
         >
           <div class="live-traffic-heading">
             <div>
-              <span class="workspace-label">Observed workstation traffic</span>
-              <h2>Live Traffic</h2>
+              <span class="workspace-label">Internet path test</span>
+              <h2>Speed Test</h2>
             </div>
-            <span id="liveTrafficState" class="badge">Waiting for adapter</span>
+            <span id="liveTrafficState" class="badge">Waiting for sign-in</span>
           </div>
           <dl class="live-traffic-grid">
             <div>
-              <dt>RX Mbps <button class="info-tip" type="button" title="Receive rate: the approximate incoming traffic observed on this workstation's wired adapter." aria-label="What is RX Mbps?">?</button></dt>
+              <dt>Download Mbps <button class="info-tip" type="button" title="HTTP download throughput measured against Cloudflare's nearest reachable edge." aria-label="What is download Mbps?">?</button></dt>
               <dd id="liveTrafficRx" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>TX Mbps <button class="info-tip" type="button" title="Transmit rate: the approximate outgoing traffic observed on this workstation's wired adapter." aria-label="What is TX Mbps?">?</button></dt>
+              <dt>Upload Mbps <button class="info-tip" type="button" title="HTTP upload throughput measured against Cloudflare's nearest reachable edge." aria-label="What is upload Mbps?">?</button></dt>
               <dd id="liveTrafficTx" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Total <button class="info-tip" type="button" title="Combined receive and transmit traffic observed during the current session." aria-label="What is Total?">?</button></dt>
+              <dt>Ping ms <button class="info-tip" type="button" title="Idle HTTP latency to the selected test edge." aria-label="What is ping?">?</button></dt>
               <dd id="liveTrafficTotal" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>Peak <button class="info-tip" type="button" title="Highest combined traffic rate observed during the current session." aria-label="What is Peak?">?</button></dt>
+              <dt>Jitter ms <button class="info-tip" type="button" title="Average variation between latency samples." aria-label="What is jitter?">?</button></dt>
               <dd id="liveTrafficPeak" class="metric-value">0.00</dd>
             </div>
             <div>
-              <dt>60s average <button class="info-tip" type="button" title="Average combined traffic rate calculated over the most recent 60 seconds." aria-label="What is 60 second average?">?</button></dt>
+              <dt>Edge <button class="info-tip" type="button" title="Nearest Cloudflare edge when the public trace endpoint is reachable." aria-label="What is edge?">?</button></dt>
               <dd id="liveTrafficAverage" class="metric-value">0.00</dd>
             </div>
           </dl>
           <div class="live-traffic-bars" aria-hidden="true">
-            <div><span>RX</span><progress id="liveTrafficRxBar" value="0" max="100"></progress></div>
-            <div><span>TX</span><progress id="liveTrafficTxBar" value="0" max="100"></progress></div>
+            <div><span>Down</span><progress id="liveTrafficRxBar" value="0" max="100"></progress></div>
+            <div><span>Up</span><progress id="liveTrafficTxBar" value="0" max="100"></progress></div>
           </div>
           <p id="liveTrafficDetail" class="comparison-note">
-            Reads only local Windows adapter counters. It does not query,
-            authenticate to, or test the switch.
+            Runs automatically after sign-in using standard HTTPS requests.
           </p>
           <p class="live-traffic-footnote">
-            Workstation view only, not switch-port counters.
+            External speed test, not switch-port counters.
           </p>
         </section>
         <div id="lastEvidence" class="evidence-strip" hidden></div>

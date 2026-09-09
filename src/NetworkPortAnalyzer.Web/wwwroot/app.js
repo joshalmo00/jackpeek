@@ -36,9 +36,14 @@ const state = {
   signedIn: false,
   liveTraffic: {
     timer: null,
-    adapterId: "",
-    previous: null,
-    samples: [],
+    controller: null,
+    started: false,
+    running: false,
+    download: 0,
+    upload: 0,
+    ping: 0,
+    jitter: 0,
+    edge: "Testing",
     busy: false,
   },
   accounts: [],
@@ -69,6 +74,7 @@ const storageStateLabel = (value) => ({
   "pending-nas-sync": "Pending synchronization",
   pending: "Cache only",
 }[value] || "Storage unavailable");
+const speedTestBase = "https://speed.cloudflare.com";
 const userDetailsAllowed = () => state.settings?.includeWindowsUser !== false;
 const empty = (title, detail) =>
   `<div class="empty-state">${emptySymbol}<h3>${escapeHtml(title)}</h3><p>${escapeHtml(detail)}</p></div>`;
@@ -197,128 +203,154 @@ const mbps = (bytes, seconds) =>
   seconds > 0 ? Math.max(0, (bytes * 8) / seconds / 1000000) : 0;
 const formatMbps = (value) =>
   Number.isFinite(value) ? value.toFixed(value >= 100 ? 1 : 2) : "0.00";
+const formatMs = (value) =>
+  Number.isFinite(value) && value > 0 ? value.toFixed(value >= 100 ? 0 : 1) : "0.0";
 
 function setLiveTrafficState(label, tone = "") {
   badge("liveTrafficState", label, tone);
 }
 
 function resetLiveTrafficValues(detail) {
-  $("liveTrafficRx").textContent = "0.00";
-  $("liveTrafficTx").textContent = "0.00";
-  $("liveTrafficTotal").textContent = "0.00";
-  $("liveTrafficPeak").textContent = "0.00";
-  $("liveTrafficAverage").textContent = "0.00";
+  $("liveTrafficRx").textContent = formatMbps(state.liveTraffic.download || 0);
+  $("liveTrafficTx").textContent = formatMbps(state.liveTraffic.upload || 0);
+  $("liveTrafficTotal").textContent = formatMs(state.liveTraffic.ping || 0);
+  $("liveTrafficPeak").textContent = formatMs(state.liveTraffic.jitter || 0);
+  $("liveTrafficAverage").textContent = state.liveTraffic.edge || "Testing";
   $("liveTrafficRxBar").value = 0;
   $("liveTrafficTxBar").value = 0;
   $("liveTrafficDetail").textContent = detail;
   $("liveTrafficPanel").classList.remove("has-live-traffic");
 }
 
-function stopLiveTraffic(detail = "Select a connected wired adapter to observe local traffic.") {
+function stopLiveTraffic(detail = "Sign in to run the internet speed test.") {
   clearInterval(state.liveTraffic.timer);
+  state.liveTraffic.controller?.abort();
   state.liveTraffic.timer = null;
-  state.liveTraffic.adapterId = "";
-  state.liveTraffic.previous = null;
-  state.liveTraffic.samples = [];
+  state.liveTraffic.controller = null;
+  state.liveTraffic.running = false;
   state.liveTraffic.busy = false;
-  setLiveTrafficState("Waiting for adapter");
+  setLiveTrafficState(state.signedIn ? "Stopped" : "Waiting for sign-in");
   resetLiveTrafficValues(detail);
 }
 
-function renderLiveTrafficSample(sample) {
-  const peak = state.liveTraffic.samples.reduce(
-    (highest, item) => Math.max(highest, item.total),
-    sample.total,
-  );
-  const average =
-    state.liveTraffic.samples.reduce((sum, item) => sum + item.total, 0) /
-    Math.max(1, state.liveTraffic.samples.length);
-  const scale = Math.max(1, peak);
-  $("liveTrafficRx").textContent = formatMbps(sample.rx);
-  $("liveTrafficTx").textContent = formatMbps(sample.tx);
-  $("liveTrafficTotal").textContent = formatMbps(sample.total);
-  $("liveTrafficPeak").textContent = formatMbps(peak);
-  $("liveTrafficAverage").textContent = formatMbps(average);
-  $("liveTrafficRxBar").value = Math.min(100, (sample.rx / scale) * 100);
-  $("liveTrafficTxBar").value = Math.min(100, (sample.tx / scale) * 100);
-  $("liveTrafficDetail").textContent =
-    "60-second rolling window from local adapter byte counters only.";
+function renderSpeedTest(detail) {
+  const scale = Math.max(10, state.liveTraffic.download, state.liveTraffic.upload);
+  $("liveTrafficRx").textContent = formatMbps(state.liveTraffic.download);
+  $("liveTrafficTx").textContent = formatMbps(state.liveTraffic.upload);
+  $("liveTrafficTotal").textContent = formatMs(state.liveTraffic.ping);
+  $("liveTrafficPeak").textContent = formatMs(state.liveTraffic.jitter);
+  $("liveTrafficAverage").textContent = state.liveTraffic.edge || "Cloudflare";
+  $("liveTrafficRxBar").value = Math.min(100, (state.liveTraffic.download / scale) * 100);
+  $("liveTrafficTxBar").value = Math.min(100, (state.liveTraffic.upload / scale) * 100);
+  $("liveTrafficDetail").textContent = detail;
   $("liveTrafficPanel").classList.add("has-live-traffic");
 }
 
-function liveTrafficUnavailableMessage(error) {
-  const message = error?.message || "";
-  if (
-    message.includes("HTTP 404") ||
-    message.includes("Traffic counters are unavailable")
-  ) {
-    return "Local traffic counters are not available for this adapter yet. JackPeek is still passive; no switch query or test traffic was sent.";
-  }
-  return message;
+async function speedFetch(url, options = {}) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    mode: "cors",
+    ...options,
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response;
 }
 
-async function pollLiveTraffic() {
-  const adapter = selectedAdapter();
-  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
-    stopLiveTraffic();
-    return;
+async function measurePing(signal) {
+  const samples = [];
+  for (let i = 0; i < 5; i++) {
+    const start = performance.now();
+    await speedFetch(`${speedTestBase}/__down?bytes=0&r=${Date.now()}-${i}`, { signal });
+    samples.push(performance.now() - start);
   }
-  if (state.liveTraffic.busy) return;
-  state.liveTraffic.busy = true;
+  samples.sort((a, b) => a - b);
+  const ping = samples[Math.floor(samples.length / 2)] || 0;
+  const jitter =
+    samples.slice(1).reduce((sum, sample, index) => sum + Math.abs(sample - samples[index]), 0) /
+    Math.max(1, samples.length - 1);
+  return { ping, jitter };
+}
+
+async function measureDownload(signal) {
+  const sizes = [500000, 2000000, 5000000, 10000000];
+  let best = 0;
+  for (const bytes of sizes) {
+    const start = performance.now();
+    const response = await speedFetch(`${speedTestBase}/__down?bytes=${bytes}&r=${Date.now()}`, { signal });
+    await response.arrayBuffer();
+    const speed = mbps(bytes, (performance.now() - start) / 1000);
+    best = Math.max(best, speed);
+    state.liveTraffic.download = best;
+    renderSpeedTest("Measuring download throughput.");
+  }
+  return best;
+}
+
+async function measureUpload(signal) {
+  const sizes = [250000, 1000000, 3000000, 5000000];
+  let best = 0;
+  for (const bytes of sizes) {
+    const payload = new Uint8Array(bytes);
+    crypto.getRandomValues(payload.subarray(0, Math.min(bytes, 65536)));
+    const start = performance.now();
+    await speedFetch(`${speedTestBase}/__up?r=${Date.now()}`, {
+      method: "POST",
+      body: payload,
+      signal,
+    });
+    const speed = mbps(bytes, (performance.now() - start) / 1000);
+    best = Math.max(best, speed);
+    state.liveTraffic.upload = best;
+    renderSpeedTest("Measuring upload throughput.");
+  }
+  return best;
+}
+
+async function detectSpeedEdge(signal) {
   try {
-    const snapshot = await request(
-      `/api/adapters/${encodeURIComponent(adapter.id)}/traffic`,
-    );
-    if (state.liveTraffic.adapterId !== adapter.id) return;
-    const previous = state.liveTraffic.previous;
-    state.liveTraffic.previous = snapshot;
-    if (!previous) {
-      setLiveTrafficState("Priming counters", "warning");
-      resetLiveTrafficValues(
-        "Reading the first local counter sample. Live rates appear on the next tick.",
-      );
-      return;
-    }
-    const seconds =
-      (Date.parse(snapshot.capturedAt) - Date.parse(previous.capturedAt)) / 1000;
-    const rx = mbps(snapshot.bytesReceived - previous.bytesReceived, seconds);
-    const tx = mbps(snapshot.bytesSent - previous.bytesSent, seconds);
-    const sample = { rx, tx, total: rx + tx };
-    state.liveTraffic.samples.push(sample);
-    state.liveTraffic.samples = state.liveTraffic.samples.slice(-60);
-    renderLiveTrafficSample(sample);
-    setLiveTrafficState("Live", "success");
-  } catch (error) {
-    setLiveTrafficState("Counters unavailable", "warning");
-    resetLiveTrafficValues(liveTrafficUnavailableMessage(error));
-  } finally {
-    state.liveTraffic.busy = false;
+    const response = await speedFetch(`${speedTestBase}/cdn-cgi/trace?r=${Date.now()}`, { signal });
+    const trace = await response.text();
+    const colo = trace.match(/^colo=(.+)$/m)?.[1]?.trim();
+    if (colo) return colo;
+  } catch {
+    return "Cloudflare";
   }
+  return "Cloudflare";
 }
 
-function startLiveTraffic() {
-  const adapter = selectedAdapter();
-  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
-    stopLiveTraffic();
-    return;
-  }
-  if (state.liveTraffic.adapterId !== adapter.id) {
-    clearInterval(state.liveTraffic.timer);
-    state.liveTraffic = {
-      timer: null,
-      adapterId: adapter.id,
-      previous: null,
-      samples: [],
-      busy: false,
-    };
-    setLiveTrafficState("Starting", "warning");
-    resetLiveTrafficValues(
-      "Reading only local Windows counters for the selected wired adapter.",
-    );
-  }
-  if (!state.liveTraffic.timer) {
-    void pollLiveTraffic();
-    state.liveTraffic.timer = setInterval(pollLiveTraffic, 1000);
+async function startLiveTraffic(force = false) {
+  if (!state.signedIn || state.liveTraffic.running) return;
+  if (state.liveTraffic.started && !force) return;
+  state.liveTraffic.started = true;
+  state.liveTraffic.running = true;
+  state.liveTraffic.controller?.abort();
+  state.liveTraffic.controller = new AbortController();
+  state.liveTraffic.download = 0;
+  state.liveTraffic.upload = 0;
+  state.liveTraffic.ping = 0;
+  state.liveTraffic.jitter = 0;
+  state.liveTraffic.edge = "Testing";
+  setLiveTrafficState("Testing", "warning");
+  renderSpeedTest("Finding the nearest reachable Cloudflare edge.");
+  try {
+    const signal = state.liveTraffic.controller.signal;
+    state.liveTraffic.edge = await detectSpeedEdge(signal);
+    const latency = await measurePing(signal);
+    state.liveTraffic.ping = latency.ping;
+    state.liveTraffic.jitter = latency.jitter;
+    renderSpeedTest("Latency measured. Measuring download throughput.");
+    await measureDownload(signal);
+    renderSpeedTest("Download measured. Measuring upload throughput.");
+    await measureUpload(signal);
+    setLiveTrafficState("Complete", "success");
+    renderSpeedTest("Speed test complete. Results are from standard HTTPS requests to Cloudflare.");
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    setLiveTrafficState("Unavailable", "warning");
+    $("liveTrafficDetail").textContent =
+      "The external speed test could not reach Cloudflare from this workstation or browser session.";
+  } finally {
+    state.liveTraffic.running = false;
   }
 }
 
@@ -437,6 +469,7 @@ async function enterWorkspace(tab) {
   showAuthScreen(null);
   showTab(tab);
   await Promise.allSettled([loadAdapters(), loadReports()]);
+  void startLiveTraffic();
   if (state.admin.isUnlocked) await Promise.all([loadAccounts(), loadAdminReviews()]);
 }
 async function signInWindows() {
@@ -477,6 +510,7 @@ async function saveProfile(event) {
 }
 async function signOut() {
   try {
+    stopLiveTraffic();
     await post("/api/access/logout", {});
     location.reload();
   } catch (error) {
@@ -560,6 +594,7 @@ function updateControls() {
     state.busy || state.adapterLoading || !state.adapters.length;
   $("adapterMenuButton").disabled =
     state.busy || state.adapterLoading || !state.adapters.length;
+  if ($("durationInput")) $("durationInput").disabled = state.busy;
   $("refreshBtn").disabled = state.busy || state.adapterLoading;
 }
 
@@ -641,7 +676,7 @@ function updateAdapter() {
     "captureState",
     adapter
       ? adapter.captureAvailable
-        ? "Passive capture ready"
+        ? "Npcap ready"
         : "Driver missing"
       : "No adapter",
     adapter ? (adapter.captureAvailable ? "success" : "warning") : "",
@@ -769,7 +804,10 @@ async function startScan(event) {
   if (state.busy || $("scanBtn").disabled || !$("captureForm").reportValidity())
     return;
   const adapter = selectedAdapter();
-  const seconds = Number(state.settings?.maxCaptureDurationSeconds || 30);
+  const configuredMax = Number(state.settings?.maxCaptureDurationSeconds || 30);
+  const requestedSeconds = Number($("durationInput")?.value || 30);
+  const seconds = Math.max(5, Math.min(configuredMax, requestedSeconds || 30));
+  if ($("durationInput")) $("durationInput").value = String(seconds);
   state.busy = true;
   updateControls();
   notice();
@@ -919,6 +957,10 @@ const knownValue = (value) =>
   value !== undefined &&
   value !== "" &&
   (!Array.isArray(value) || value.length > 0);
+const portValueText = (port, key) => {
+  const value = port?.[key];
+  return knownValue(value) ? (Array.isArray(value) ? value.join(", ") : String(value)) : "Not observed";
+};
 function comparable(key, value) {
   if (Array.isArray(value))
     return [...value]
@@ -945,6 +987,58 @@ function changedField(key, previous, current) {
     return false;
   return comparable(key, previous[key]) !== comparable(key, current[key]);
 }
+function portResultCopyText() {
+  const current = state.ports[state.selectedPort];
+  if (!current) return "";
+  const history =
+    state.selectedHistory === null
+      ? null
+      : state.portHistory[state.selectedHistory];
+  const lines = [
+    "JackPeek capture result",
+    `Captured: ${formatDate(state.result?.completedAt)}`,
+    `Evidence ID: ${state.currentEvidence?.evidenceId || "Not recorded"}`,
+    "",
+    "Current switch port",
+    ...portFields.map(([, label], index) => {
+      const key = portFields[index][0];
+      return `${label}: ${portValueText(current, key)}`;
+    }),
+  ];
+  if (current.conflicts?.length) {
+    lines.push("", "Conflicts", ...current.conflicts.map((item) => `- ${item}`));
+  }
+  if (history) {
+    lines.push(
+      "",
+      `Compared with: ${formatDate(history.scannedAt)} by ${history.scannedBy || "Name not recorded"} on ${history.workstation || "Workstation not recorded"}`,
+      "Changed fields",
+    );
+    const differences = portFields.filter(([key]) => changedField(key, history.port, current));
+    lines.push(
+      ...(differences.length
+        ? differences.map(
+            ([key, label]) =>
+              `${label}: ${portValueText(history.port, key)} -> ${portValueText(current, key)}`,
+          )
+        : ["None"]),
+    );
+  }
+  return lines.join("\n");
+}
+async function copyPortResults() {
+  const text = portResultCopyText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    $("copyPortResultsBtn").textContent = "Copied";
+    setTimeout(() => {
+      if ($("copyPortResultsBtn")) $("copyPortResultsBtn").textContent = "Copy results";
+    }, 1500);
+  } catch {
+    notice("Could not copy results to the clipboard.", "error");
+  }
+}
 function renderPortComparison() {
   const current = state.ports[state.selectedPort];
   if (!current) return;
@@ -955,31 +1049,22 @@ function renderPortComparison() {
   const differences = history
     ? portFields.filter(([key]) => changedField(key, history.port, current))
     : [];
-  const groups = [
-    ["Switch identity", ["switchName", "switchMac", "switchIp"]],
-    ["Port", ["port", "portDescription", "capabilities"]],
-    ["Network", ["nativeVlan", "voiceVlan", "duplex"]],
-  ];
-  const card = (port, title, subtitle) =>
-    `<section class="port-card" aria-label="${escapeHtml(title)}"><div class="port-card-heading"><span class="badge">${escapeHtml(title)}</span><p>${escapeHtml(subtitle)}</p></div>${groups
-      .map(([groupTitle, keys]) => `<div class="result-group"><h4>${escapeHtml(groupTitle)}</h4><dl class="port-values">${keys
-      .map((key) => {
-        const label = portFields.find(([fieldKey]) => fieldKey === key)?.[1] || key;
-        const value = port[key];
-        const changed = history && changedField(key, history.port, current);
-        return `<div class="port-value ${changed ? "value-changed" : ""}"><dt>${escapeHtml(label)}${changed ? '<span class="change-marker">Changed</span>' : ""}</dt><dd>${escapeHtml(knownValue(value) ? (Array.isArray(value) ? value.join(", ") : value) : "Not observed")}</dd></div>`;
+  const listRows = (port, compareTo = null) =>
+    portFields
+      .map(([key, label]) => {
+        const changed = compareTo && changedField(key, compareTo, port);
+        return `<div class="port-list-row ${changed ? "value-changed" : ""}"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(portValueText(port, key))}</dd>${changed ? '<span class="change-marker">Changed</span>' : ""}</div>`;
       })
-      .join("")}</dl></div>`)
-      .join("")}${port.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertised values</strong><ul>${port.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}</section>`;
+      .join("");
   const selector =
     state.ports.length > 1
       ? `<label class="port-selector">Captured switch port<select id="capturedPortSelect">${state.ports.map((port, i) => `<option value="${i}" ${i === state.selectedPort ? "selected" : ""}>${escapeHtml(port.switchName || port.chassisId || "Unnamed switch")} · ${escapeHtml(port.port || "Unknown port")}</option>`).join("")}</select></label>`
       : "";
   $("results").innerHTML =
-    `${selector}<div class="port-result-heading"><div><h3>${escapeHtml(current.switchName || "Switch name not observed")}</h3><p>Port ${escapeHtml(current.port || "not observed")}</p></div>${history ? '<button id="closeComparisonBtn" class="button small" type="button">Close comparison</button>' : '<span class="badge success">Current capture</span>'}</div>
-    ${history ? `<p class="comparison-status" role="status">${differences.length ? plural(differences.length, "changed field") : "No confirmed value changes"} compared with ${escapeHtml(formatDate(history.scannedAt))}.</p>` : ""}
-    <div class="port-comparison ${history ? "is-comparing" : ""}">${history ? card(history.port, "Previous capture", formatDate(history.scannedAt) + " · " + (history.scannedBy || "Name not recorded") + " · " + history.workstation) : ""}${card(current, "Current capture", formatDate(state.result?.completedAt) + " · " + (state.currentEvidence?.displayName || state.currentEvidence?.userName || "Name not recorded"))}</div>
-    <p class="comparison-note">Only values observed in both captures are highlighted as changed. Missing values were not observed, and do not confirm a configuration change.</p>`;
+    `<section class="port-dashboard">${selector}<div class="port-result-heading"><div><span class="workspace-label">Current capture</span><h3>${escapeHtml(current.switchName || "Switch name not observed")}</h3><p>Port ${escapeHtml(current.port || "not observed")} · ${escapeHtml(formatDate(state.result?.completedAt))}</p></div><div class="port-result-actions"><button id="copyPortResultsBtn" class="button small" type="button">Copy results</button>${history ? '<button id="closeComparisonBtn" class="button small" type="button">Close comparison</button>' : '<span class="badge success">Current capture</span>'}</div></div>
+    ${history ? `<div class="comparison-status" role="status">${differences.length ? plural(differences.length, "changed field") : "No confirmed value changes"} compared with ${escapeHtml(formatDate(history.scannedAt))}.</div><div class="port-side-by-side"><section class="port-list-panel"><h4>Previous</h4><p>${escapeHtml(formatDate(history.scannedAt))} · ${escapeHtml(history.scannedBy || "Name not recorded")} · ${escapeHtml(history.workstation || "Workstation not recorded")}</p><dl>${listRows(history.port, current)}</dl></section><section class="port-list-panel"><h4>Current</h4><p>${escapeHtml(formatDate(state.result?.completedAt))} · ${escapeHtml(state.currentEvidence?.displayName || state.currentEvidence?.userName || "Name not recorded")}</p><dl>${listRows(current, history.port)}</dl></section></div>` : `<dl class="port-list">${listRows(current)}</dl>`}
+    ${current.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertised values</strong><ul>${current.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}
+    ${history ? '<p class="comparison-note">Only values observed in both captures are highlighted as changed. Missing values do not confirm a configuration change.</p>' : ""}</section>`;
 }
 function selectPort(index) {
   if (!state.ports[index]) return;
@@ -1011,7 +1096,7 @@ async function loadSelectedPortHistory() {
     if (id !== state.portHistoryRequest) return;
     state.portHistory = result.entries || [];
     $("neighborList").innerHTML =
-      `${result.warning ? `<p class="history-warning" role="status">${escapeHtml(result.warning)}</p>` : ""}${state.portHistory.length ? `<p class="history-count">${plural(state.portHistory.length, "previous capture")}</p>` + state.portHistory.map((record, i) => `<button class="port-history-item" type="button" data-port-history="${i}" aria-pressed="false"><strong>${escapeHtml(formatDate(record.scannedAt))}</strong><span>${escapeHtml(record.scannedBy || "Name not recorded")}</span><small>${escapeHtml(record.workstation)}</small></button>`).join("") : '<p class="sidebar-empty">No previous captures found for this port.</p>'}`;
+      `${result.warning ? `<p class="history-warning" role="status">${escapeHtml(result.warning)}</p>` : ""}${state.portHistory.length ? `<p class="history-count">${plural(state.portHistory.length, "previous capture")}</p>` + state.portHistory.map((record, i) => `<button class="port-history-item" type="button" data-port-history="${i}" aria-pressed="false"><strong>${escapeHtml(formatDate(record.scannedAt))}</strong><span>${escapeHtml(record.scannedBy || "Name not recorded")}</span></button>`).join("") : '<p class="sidebar-empty">No previous captures found for this port.</p>'}`;
   } catch (error) {
     if (id !== state.portHistoryRequest) return;
     $("neighborList").innerHTML =
@@ -1333,6 +1418,12 @@ function applySettings(settings) {
     else if (control.tagName === "SELECT")
       control.value = settings[key] || "local-nas-mirror";
     else control.value = settings[key] ?? "";
+  }
+  if ($("durationInput")) {
+    const max = Math.max(5, Number(settings.maxCaptureDurationSeconds || 30));
+    const current = Number($("durationInput").value || 30);
+    $("durationInput").max = String(max);
+    $("durationInput").value = String(Math.max(5, Math.min(max, current)));
   }
   const adminLocked = settingsRequireAdminUnlock();
   $("settingsFields").disabled = !settings.allowSettingsEdit || adminLocked;
@@ -1901,6 +1992,10 @@ $("results").addEventListener("change", (event) => {
     selectPort(Number(event.target.value));
 });
 $("results").addEventListener("click", (event) => {
+  if (event.target.closest("#copyPortResultsBtn")) {
+    void copyPortResults();
+    return;
+  }
   if (!event.target.closest("#closeComparisonBtn")) return;
   state.selectedHistory = null;
   document

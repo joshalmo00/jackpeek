@@ -56,6 +56,11 @@
               observe and retain network information.
             </p>
             <p>
+              The internet speed test generates standard HTTPS test traffic to
+              an external test provider after sign-in. Use it only where that
+              traffic is permitted by local policy.
+            </p>
+            <p>
               You are responsible for the workstation, browser, capture driver,
               storage paths, and people who can access them. Do not expose the
               local interface through a proxy or tunnel to an untrusted network.
@@ -111,11 +116,13 @@
             </p>
             <p>
               Npcap is installed separately and governed by its own license.
-              JackPeek does not bundle or silently install Npcap. Obtain
-              dependencies from their authorized distributors and comply with
-              their terms. An offline JackPeek license, when required by local
-              policy, is validated on the workstation and may be restricted by
-              dates or machine assignment.
+              JackPeek does not bundle or silently install Npcap. The speed test
+              design is informed by open-source speed test projects and uses
+              external HTTPS test endpoints rather than bundled third-party test
+              code. Obtain dependencies from their authorized distributors and
+              comply with their terms. An offline JackPeek license, when
+              required by local policy, is validated on the workstation and may
+              be restricted by dates or machine assignment.
             </p>
           </section>
           <section id="availability">

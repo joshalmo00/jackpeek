@@ -220,6 +220,8 @@ fs.mkdirSync(output, { recursive: true });
       else if (url.pathname === "/api/access/login")
         body = { isApproved: true, requiresProfile: false };
       else if (url.pathname === "/api/admin/accounts") body = [];
+      else if (url.pathname === "/api/admin/reviews")
+        body = { summary: {}, queue: [] };
       else if (url.pathname === "/api/reports") body = reports;
       else if (url.pathname === "/api/ports/log") body = portLog;
       else if (url.pathname === "/api/ports/history")
