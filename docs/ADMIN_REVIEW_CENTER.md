@@ -8,7 +8,7 @@ JackPeek's Admin Review Center is a local-only workspace for evidence events tha
 - A 3/3 match is treated as confirmed continuity.
 - A 2/3 match keeps the historical continuity but remains pending for administrator review.
 - A 1/3 match creates a new identity folder and remains visible for review.
-- A capture waiting for NAS synchronization appears in the same queue with its expiration time.
+- A capture waiting for NAS synchronization appears in the same queue. Pending uploads are retained locally until synchronization succeeds.
 
 The original evidence record is never changed or deleted by a decision. Decisions are stored locally in AdminReviewDecisions.json and written to the existing audit log with the administrator identity, timestamp, status, and optional comment.
 

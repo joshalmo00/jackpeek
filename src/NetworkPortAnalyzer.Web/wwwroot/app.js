@@ -16,7 +16,8 @@ function setupContextHelp() {
   function close() {
     clearTimeout(closeTimer);
     if (trigger) {
-      if (previousDescription === null) trigger.removeAttribute("aria-describedby");
+      if (previousDescription === null)
+        trigger.removeAttribute("aria-describedby");
       else trigger.setAttribute("aria-describedby", previousDescription);
     }
     tooltip.hidden = true;
@@ -32,7 +33,10 @@ function setupContextHelp() {
     button.removeAttribute("title");
     trigger = button;
     previousDescription = button.getAttribute("aria-describedby");
-    button.setAttribute("aria-describedby", [previousDescription, tooltip.id].filter(Boolean).join(" "));
+    button.setAttribute(
+      "aria-describedby",
+      [previousDescription, tooltip.id].filter(Boolean).join(" "),
+    );
     tooltip.textContent = description;
     tooltip.hidden = false;
     position();
@@ -40,7 +44,10 @@ function setupContextHelp() {
   function position() {
     if (!trigger) return;
     const anchor = trigger.getBoundingClientRect();
-    if (anchor.bottom < 0 || anchor.top > innerHeight) { close(); return; }
+    if (anchor.bottom < 0 || anchor.top > innerHeight) {
+      close();
+      return;
+    }
     const box = tooltip.getBoundingClientRect();
     tooltip.style.left = `${Math.max(12, Math.min(anchor.left, innerWidth - box.width - 12))}px`;
     const below = anchor.bottom + 8;
@@ -67,7 +74,9 @@ function setupContextHelp() {
     if (button) open(button);
     else if (!tooltip.contains(event.target)) close();
   });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
+  });
   document.addEventListener("scroll", position, true);
   window.addEventListener("resize", close);
 }
@@ -106,21 +115,18 @@ const state = {
   logoClickTimer: null,
   access: { isApproved: false },
   signedIn: false,
-  liveTraffic: {
-    timer: null,
-    adapterId: "",
-    previous: null,
-    samples: [],
-    busy: false,
-  },
+  speedTest: { engine: null, autoStarted: false },
   accounts: [],
   adminReviews: [],
   selectedAdminReview: null,
   adminReviewFilter: "all",
+  nasHealth: null,
+  nasHealthOpen: false,
 };
 const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
-const emptySymbol =
-  '<div class="empty-symbol" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="12" width="34" height="24" rx="3"/><path d="M13 22h4v6h-4zm9 0h4v6h-4zm9 0h4v6h-4M14 17h20"/></svg></div>';
+const iconMarkup = (name) =>
+  `<svg class="icon" aria-hidden="true"><use href="/assets/heroicons.svg#${name}" /></svg>`;
+const emptySymbol = `<div class="empty-symbol" aria-hidden="true">${iconMarkup("server")}</div>`;
 const escapeHtml = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -135,18 +141,113 @@ const formatDate = (value) =>
     : "Not recorded";
 const plural = (value, noun, pluralNoun = `${noun}s`) =>
   `${value} ${value === 1 ? noun : pluralNoun}`;
-const storageStateLabel = (value) => ({
-  "local-saved": "Local",
-  "local-and-nas-synced": "NAS synchronized",
-  "nas-synced": "NAS synchronized",
-  "pending-nas-sync": "Pending synchronization",
-  pending: "Cache only",
-}[value] || "Storage unavailable");
+const storageStateLabel = (value) =>
+  ({
+    "local-saved": "Local",
+    "local-and-nas-synced": "NAS synchronized",
+    "nas-synced": "NAS synchronized",
+    "pending-nas-sync": "Pending synchronization",
+    pending: "Cache only",
+  })[value] || "Storage unavailable";
 const userDetailsAllowed = () => state.settings?.includeWindowsUser !== false;
 const empty = (title, detail) =>
   `<div class="empty-state">${emptySymbol}<h3>${escapeHtml(title)}</h3><p>${escapeHtml(detail)}</p></div>`;
 const selectedAdapter = () =>
   state.adapters.find((a) => a.id === $("adapterSelect").value);
+
+function renderNasHealth() {
+  const health = state.nasHealth;
+  const dock = $("nasHealthDock");
+  const menu = $("nasHealthMenu");
+  const open = state.nasHealthOpen;
+  menu.hidden = !open;
+  $("nasHealthBtn").setAttribute("aria-expanded", String(open));
+  if (!health) {
+    dock.dataset.state = "unknown";
+    badge("nasHealthState", "Checking");
+    $("nasHealthMessage").textContent = "Checking NAS repository health.";
+    $("nasRetainedCount").textContent = "0";
+    $("nasPendingCount").textContent = "0";
+    $("nasExpiringCount").textContent = "0";
+    $("nasNextExpiry").textContent = "None";
+    $("nasArchivePath").textContent = "Archive path not loaded.";
+    $("nasHealthBadge").hidden = true;
+    $("nasForceUploadBtn").disabled = true;
+    return;
+  }
+  dock.dataset.state = health.state || "error";
+  const tone =
+    health.state === "healthy"
+      ? "success"
+      : health.state === "warning"
+        ? "warning"
+        : "error";
+  badge(
+    "nasHealthState",
+    health.connected
+      ? health.state === "warning"
+        ? "Attention"
+        : "Connected"
+      : "Unavailable",
+    tone,
+  );
+  $("nasHealthMessage").textContent = health.connected
+    ? health.expiringSoonLogs > 0
+      ? "NAS is reachable. Some retained local cache records are close to cleanup."
+      : "NAS is reachable. New captures are saved to the repository when possible."
+    : health.lastError || "NAS repository is not reachable.";
+  $("nasRetainedCount").textContent = String(health.retainedLocalLogs || 0);
+  $("nasPendingCount").textContent = String(health.pendingUploadLogs || 0);
+  $("nasExpiringCount").textContent = String(health.expiringSoonLogs || 0);
+  $("nasNextExpiry").textContent = health.nextExpiration
+    ? formatDate(health.nextExpiration)
+    : "None";
+  $("nasArchivePath").textContent =
+    health.archivePath || "No NAS archive path configured.";
+  const attention = (health.pendingUploadLogs || 0) + (health.expiringSoonLogs || 0);
+  $("nasHealthBadge").hidden = attention === 0 && health.connected;
+  $("nasHealthBadge").textContent = String(Math.max(1, attention));
+  $("nasForceUploadBtn").disabled = !state.signedIn || (health.pendingUploadLogs || 0) === 0;
+}
+
+async function loadNasHealth() {
+  if (!state.signedIn) return;
+  try {
+    state.nasHealth = await request("/api/nas/health");
+  } catch (error) {
+    state.nasHealth = {
+      state: "error",
+      connected: false,
+      retainedLocalLogs: 0,
+      pendingUploadLogs: 0,
+      expiringSoonLogs: 0,
+      lastError: error.message,
+    };
+  }
+  renderNasHealth();
+}
+
+async function forceNasUpload() {
+  $("nasForceUploadBtn").disabled = true;
+  $("nasForceUploadBtn").setAttribute("aria-busy", "true");
+  $("nasHealthSyncStatus").textContent = "Uploading pending logs to NAS...";
+  try {
+    const result = await post("/api/nas/sync", {});
+    state.nasHealth = result.health;
+    state.pendingCache = state.nasHealth.pending || [];
+    $("nasHealthSyncStatus").textContent =
+      `${result.sync?.uploaded || 0} uploaded, ${result.sync?.failed || 0} failed, ${result.sync?.deletedExpired || 0} local cache record(s) cleaned.`;
+    renderNasHealth();
+    renderAdminWorkspace();
+    void loadReports();
+  } catch (error) {
+    $("nasHealthSyncStatus").textContent = error.message;
+    await loadNasHealth();
+  } finally {
+    $("nasForceUploadBtn").setAttribute("aria-busy", "false");
+    renderNasHealth();
+  }
+}
 
 function normalizeWorkstation(value) {
   if (!value) return value;
@@ -167,15 +268,14 @@ function normalizeAccess(value) {
     displayName: value.displayName || value.userName || value.account,
     message:
       value.message ||
-      (value.isApproved ?? value.approved
+      ((value.isApproved ?? value.approved)
         ? "This account is approved."
         : "This Windows account is not approved."),
   };
 }
 
 function updateSettingsTabVisibility() {
-  const adminUnlocked =
-    state.admin?.isUnlocked === true;
+  const adminUnlocked = state.admin?.isUnlocked === true;
   const settingsTab = $("settings-tab");
   settingsTab.hidden = !adminUnlocked;
   settingsTab.style.display = adminUnlocked ? "" : "none";
@@ -223,7 +323,10 @@ async function request(path, options = {}) {
     state.adminReviews = [];
     updateSettingsTabVisibility();
     showTab("capture");
-    notice("Administrator session expired. Sign in again to continue.", "warning");
+    notice(
+      "Administrator session expired. Sign in again to continue.",
+      "warning",
+    );
   }
   if (!response.ok)
     throw new Error(
@@ -266,133 +369,101 @@ function npcapNotice() {
   $("captureNotice").append(link);
 }
 
-const mbps = (bytes, seconds) =>
-  seconds > 0 ? Math.max(0, (bytes * 8) / seconds / 1000000) : 0;
-const formatMbps = (value) =>
-  Number.isFinite(value) ? value.toFixed(value >= 100 ? 1 : 2) : "0.00";
-
-function setLiveTrafficState(label, tone = "") {
-  badge("liveTrafficState", label, tone);
+function renderSpeedChart(result) {
+  const samples = Array.isArray(result.samples) ? result.samples : [];
+  const latest =
+    Number.isFinite(result.currentMbps) && result.running
+      ? result.currentMbps
+      : Number.isFinite(result.upload)
+        ? result.upload
+        : Number.isFinite(result.download)
+          ? result.download
+          : null;
+  $("speedGaugeValue").textContent = Number.isFinite(latest)
+    ? latest.toFixed(latest >= 100 ? 0 : 1)
+    : "–";
+  $("speedGaugeLabel").textContent =
+    result.currentDirection === "upload"
+      ? "upload Mbps"
+      : result.currentDirection === "download"
+        ? "download Mbps"
+        : "Mbps";
+  if (!samples.length) {
+    $("speedChartPath").setAttribute("d", "");
+    $("speedChartPeak").textContent = "Waiting";
+    return;
+  }
+  const peak = Math.max(1, ...samples.map((sample) => sample.mbps || 0));
+  const width = 360;
+  const height = 120;
+  const last = Math.max(1, samples.length - 1);
+  const path = samples
+    .map((sample, index) => {
+      const x = (index / last) * width;
+      const y =
+        height -
+        Math.min(1, (sample.mbps || 0) / peak) * (height - 12) -
+        6;
+      return `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  $("speedChartPath").setAttribute("d", path);
+  $("speedChartPeak").textContent = `${peak.toFixed(peak >= 100 ? 0 : 1)} Mbps peak`;
 }
 
-function resetLiveTrafficValues(detail) {
-  $("liveTrafficRx").textContent = "0.00";
-  $("liveTrafficTx").textContent = "0.00";
-  $("liveTrafficTotal").textContent = "0.00";
-  $("liveTrafficPeak").textContent = "0.00";
-  $("liveTrafficAverage").textContent = "0.00";
-  $("liveTrafficRxBar").value = 0;
-  $("liveTrafficTxBar").value = 0;
-  $("liveTrafficDetail").textContent = detail;
-  $("liveTrafficPanel").classList.remove("has-live-traffic");
-}
-
-function stopLiveTraffic(detail = "Select a connected wired adapter to observe local traffic.") {
-  clearInterval(state.liveTraffic.timer);
-  state.liveTraffic.timer = null;
-  state.liveTraffic.adapterId = "";
-  state.liveTraffic.previous = null;
-  state.liveTraffic.samples = [];
-  state.liveTraffic.busy = false;
-  setLiveTrafficState("Waiting for adapter");
-  resetLiveTrafficValues(detail);
-}
-
-function renderLiveTrafficSample(sample) {
-  const peak = state.liveTraffic.samples.reduce(
-    (highest, item) => Math.max(highest, item.total),
-    sample.total,
+function renderSpeedTest(result) {
+  const number = (value) =>
+    Number.isFinite(value) ? value.toFixed(value >= 100 ? 0 : 1) : "–";
+  $("speedDownload").textContent = number(result.download);
+  $("speedUpload").textContent = number(result.upload);
+  $("speedPing").textContent = number(result.ping);
+  $("speedJitter").textContent = number(result.jitter);
+  $("speedEdge").textContent = result.edge || "Not available";
+  renderSpeedChart(result);
+  const label = {
+    idle: "Ready",
+    latency: "Measuring latency",
+    download: "Testing download",
+    upload: "Testing upload",
+    complete: "Complete",
+    cancelled: "Cancelled",
+    error: "Incomplete",
+  };
+  badge(
+    "speedTestState",
+    label[result.phase] || "Ready",
+    result.phase === "complete"
+      ? "success"
+      : result.phase === "error"
+        ? "warning"
+        : "",
   );
-  const average =
-    state.liveTraffic.samples.reduce((sum, item) => sum + item.total, 0) /
-    Math.max(1, state.liveTraffic.samples.length);
-  const scale = Math.max(1, peak);
-  $("liveTrafficRx").textContent = formatMbps(sample.rx);
-  $("liveTrafficTx").textContent = formatMbps(sample.tx);
-  $("liveTrafficTotal").textContent = formatMbps(sample.total);
-  $("liveTrafficPeak").textContent = formatMbps(peak);
-  $("liveTrafficAverage").textContent = formatMbps(average);
-  $("liveTrafficRxBar").value = Math.min(100, (sample.rx / scale) * 100);
-  $("liveTrafficTxBar").value = Math.min(100, (sample.tx / scale) * 100);
-  $("liveTrafficDetail").textContent =
-    "60-second rolling window from local adapter byte counters only.";
-  $("liveTrafficPanel").classList.add("has-live-traffic");
+  $("speedTestPanel").classList.toggle("is-running", result.running);
+  $("speedTestPanel").dataset.phase = result.phase;
+  $("speedTestProgress").value = result.progress;
+  $("speedTestProgress").setAttribute(
+    "aria-label",
+    `${label[result.phase]}: ${Math.round(result.progress)}%`,
+  );
+  $("speedTestDetail").textContent = result.detail;
+  $("speedTestStartBtn").disabled = result.running || !state.signedIn;
+  $("speedTestStartBtn").innerHTML =
+    `${iconMarkup(result.phase === "idle" ? "play" : "arrow-path")}<span>${result.phase === "idle" ? "Run speed test" : "Run again"}</span>`;
+  $("speedTestCancelBtn").hidden = !result.running;
 }
 
-function liveTrafficUnavailableMessage(error) {
-  const message = error?.message || "";
-  if (
-    message.includes("HTTP 404") ||
-    message.includes("Traffic counters are unavailable")
-  ) {
-    return "Local traffic counters are not available for this adapter yet. JackPeek is still passive; no switch query or test traffic was sent.";
-  }
-  return message;
+function startSpeedTest(manual = false) {
+  if (!state.signedIn || (!manual && state.speedTest.autoStarted)) return;
+  state.speedTest.autoStarted = true;
+  if (!state.speedTest.engine)
+    state.speedTest.engine = new window.JackPeekSpeedTest({
+      onUpdate: renderSpeedTest,
+    });
+  void state.speedTest.engine.run();
 }
 
-async function pollLiveTraffic() {
-  const adapter = selectedAdapter();
-  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
-    stopLiveTraffic();
-    return;
-  }
-  if (state.liveTraffic.busy) return;
-  state.liveTraffic.busy = true;
-  try {
-    const snapshot = await request(
-      `/api/adapters/${encodeURIComponent(adapter.id)}/traffic`,
-    );
-    if (state.liveTraffic.adapterId !== adapter.id) return;
-    const previous = state.liveTraffic.previous;
-    state.liveTraffic.previous = snapshot;
-    if (!previous) {
-      setLiveTrafficState("Priming counters", "warning");
-      resetLiveTrafficValues(
-        "Reading the first local counter sample. Live rates appear on the next tick.",
-      );
-      return;
-    }
-    const seconds =
-      (Date.parse(snapshot.capturedAt) - Date.parse(previous.capturedAt)) / 1000;
-    const rx = mbps(snapshot.bytesReceived - previous.bytesReceived, seconds);
-    const tx = mbps(snapshot.bytesSent - previous.bytesSent, seconds);
-    const sample = { rx, tx, total: rx + tx };
-    state.liveTraffic.samples.push(sample);
-    state.liveTraffic.samples = state.liveTraffic.samples.slice(-60);
-    renderLiveTrafficSample(sample);
-    setLiveTrafficState("Live", "success");
-  } catch (error) {
-    setLiveTrafficState("Counters unavailable", "warning");
-    resetLiveTrafficValues(liveTrafficUnavailableMessage(error));
-  } finally {
-    state.liveTraffic.busy = false;
-  }
-}
-
-function startLiveTraffic() {
-  const adapter = selectedAdapter();
-  if (!state.signedIn || !adapter || adapter.operationalStatus !== "Up") {
-    stopLiveTraffic();
-    return;
-  }
-  if (state.liveTraffic.adapterId !== adapter.id) {
-    clearInterval(state.liveTraffic.timer);
-    state.liveTraffic = {
-      timer: null,
-      adapterId: adapter.id,
-      previous: null,
-      samples: [],
-      busy: false,
-    };
-    setLiveTrafficState("Starting", "warning");
-    resetLiveTrafficValues(
-      "Reading only local Windows counters for the selected wired adapter.",
-    );
-  }
-  if (!state.liveTraffic.timer) {
-    void pollLiveTraffic();
-    state.liveTraffic.timer = setInterval(pollLiveTraffic, 1000);
-  }
+function stopSpeedTest() {
+  state.speedTest.engine?.cancel();
 }
 
 function shouldShowNpcapDialog() {
@@ -451,7 +522,7 @@ function showAuthScreen(id) {
   });
   document.body.classList.toggle("auth-active", Boolean(id));
   if (id) {
-    stopLiveTraffic();
+    stopSpeedTest();
     hideNpcapDialog();
     document.title = "Secure access | JackPeek";
     window.scrollTo(0, 0);
@@ -510,9 +581,10 @@ async function enterWorkspace(tab) {
   }
   showAuthScreen(null);
   showTab(tab);
+  startSpeedTest();
   await Promise.allSettled([loadAdapters(), loadReports()]);
-  void startLiveTraffic();
-  if (state.admin.isUnlocked) await Promise.all([loadAccounts(), loadAdminReviews()]);
+  if (state.admin.isUnlocked)
+    await Promise.all([loadAccounts(), loadAdminReviews()]);
 }
 async function signInWindows() {
   $("windowsSignInBtn").disabled = true;
@@ -538,6 +610,7 @@ async function saveProfile(event) {
   event.preventDefault();
   if (!$("profileForm").reportValidity()) return;
   $("profileSubmitBtn").disabled = true;
+  $("profileSubmitBtn").setAttribute("aria-busy", "true");
   try {
     await post("/api/access/profile", {
       firstName: $("firstNameInput").value.trim(),
@@ -548,11 +621,12 @@ async function saveProfile(event) {
     $("profileStatus").textContent = error.message;
   } finally {
     $("profileSubmitBtn").disabled = false;
+    $("profileSubmitBtn").setAttribute("aria-busy", "false");
   }
 }
 async function signOut() {
   try {
-    stopLiveTraffic();
+    stopSpeedTest();
     await post("/api/access/logout", {});
     location.reload();
   } catch (error) {
@@ -561,14 +635,9 @@ async function signOut() {
 }
 
 function showTab(name, updateUrl = true) {
-  if (
-    name === "settings" &&
-    !(state.admin?.isUnlocked === true)
-  )
+  if (name === "settings" && !(state.admin?.isUnlocked === true))
     name = "capture";
-  if (
-    !tabs.some((tab) => tab.dataset.tab === name && tab.hidden !== true)
-  )
+  if (!tabs.some((tab) => tab.dataset.tab === name && tab.hidden !== true))
     name = "capture";
   tabs.forEach((tab) => {
     const active = tab.dataset.tab === name;
@@ -638,6 +707,9 @@ function updateControls() {
     state.busy || state.adapterLoading || !state.adapters.length;
   if ($("durationInput")) $("durationInput").disabled = state.busy;
   $("refreshBtn").disabled = state.busy || state.adapterLoading;
+  $("scanBtn").setAttribute("aria-busy", String(state.busy));
+  $("saveSettingsBtn").setAttribute("aria-busy", String(state.settingsBusy));
+  $("refreshBtn").setAttribute("aria-busy", String(state.adapterLoading));
 }
 
 function captureSupportUnavailable() {
@@ -653,7 +725,8 @@ function adapterStatusLabel(adapter) {
 function adapterDescription(adapter) {
   const name = String(adapter?.name || "").trim();
   const description = String(adapter?.description || "").trim();
-  return description && description.localeCompare(name, undefined, { sensitivity: "accent" }) !== 0
+  return description &&
+    description.localeCompare(name, undefined, { sensitivity: "accent" }) !== 0
     ? description
     : "";
 }
@@ -704,14 +777,14 @@ function selectAdapter(id) {
   $("adapterSelect").value = id;
   closeAdapterMenu();
   updateAdapter();
-  startLiveTraffic();
 }
 
 function updateAdapter() {
   const adapter = selectedAdapter();
   const description = adapterDescription(adapter);
   $("adapterName").textContent = adapter?.name || "No wired Ethernet adapter";
-  $("adapterDescription").textContent = description ||
+  $("adapterDescription").textContent =
+    description ||
     (adapter ? "" : "Connect a physical Ethernet adapter, then refresh.");
   $("adapterDescription").hidden = Boolean(adapter && !description);
   $("adapterMac").textContent = adapter?.macAddress || "Not available";
@@ -750,8 +823,7 @@ function updateAdapter() {
         "The selected adapter has no active link. Connect it to a switch before capturing.",
       );
     } else if (!adapter.captureAvailable) {
-      $("status").textContent =
-        "Passive capture needs the local Npcap driver.";
+      $("status").textContent = "Passive capture needs the local Npcap driver.";
       npcapNotice();
     } else if (state.settings?.requireValidLicense && !state.license?.isValid) {
       $("status").textContent = "Capture is blocked by license policy.";
@@ -789,7 +861,6 @@ function updateAdapter() {
   }
   updateControls();
   renderAdapterMenu();
-  startLiveTraffic();
 }
 
 async function loadAdapters() {
@@ -805,8 +876,7 @@ async function loadAdapters() {
     state.adapters = adapters;
     $("adapterSelect").replaceChildren(
       ...adapters.map(
-        (adapter) =>
-          new Option(adapterDisplayName(adapter), adapter.id),
+        (adapter) => new Option(adapterDisplayName(adapter), adapter.id),
       ),
     );
     if (!adapters.length)
@@ -818,7 +888,6 @@ async function loadAdapters() {
             .id;
     renderAdapterMenu();
     updateAdapter();
-    startLiveTraffic();
     if (adapters.some((adapter) => adapter.captureAvailable)) {
       hideNpcapDialog();
     } else {
@@ -829,7 +898,6 @@ async function loadAdapters() {
     $("adapterSelect").replaceChildren(new Option("Adapters unavailable", ""));
     renderAdapterMenu();
     updateAdapter();
-    stopLiveTraffic("Adapter discovery failed. Refresh adapters to retry.");
     $("status").textContent = error.message;
     notice("Adapter discovery failed. Refresh adapters to retry.", "error");
   } finally {
@@ -847,7 +915,9 @@ function startCountdown(seconds) {
     const elapsed = (Date.now() - started) / 1000;
     const remaining = Math.max(0, Math.ceil(seconds - elapsed));
     $("progressBar").value = Math.min(100, (elapsed / seconds) * 100);
-    $("countdown").textContent = remaining ? "Listening" : "Processing";
+    $("countdown").textContent = remaining
+      ? `${remaining}s remaining`
+      : "Saving results";
     $("progressText").textContent = remaining
       ? "Listening for switch advertisements"
       : "Waiting for results and evidence storage";
@@ -975,6 +1045,7 @@ function finishScan(scan) {
   }
   updateControls();
   void loadReports();
+  void loadNasHealth();
 }
 
 function renderResults(error) {
@@ -1017,7 +1088,11 @@ const knownValue = (value) =>
   (!Array.isArray(value) || value.length > 0);
 const portValueText = (port, key) => {
   const value = port?.[key];
-  return knownValue(value) ? (Array.isArray(value) ? value.join(", ") : String(value)) : "Not observed";
+  return knownValue(value)
+    ? Array.isArray(value)
+      ? value.join(", ")
+      : String(value)
+    : "Not observed";
 };
 function comparable(key, value) {
   if (Array.isArray(value))
@@ -1064,7 +1139,11 @@ function portResultCopyText() {
     }),
   ];
   if (current.conflicts?.length) {
-    lines.push("", "Conflicts", ...current.conflicts.map((item) => `- ${item}`));
+    lines.push(
+      "",
+      "Conflicts",
+      ...current.conflicts.map((item) => `- ${item}`),
+    );
   }
   if (history) {
     lines.push(
@@ -1072,7 +1151,9 @@ function portResultCopyText() {
       `Compared with: ${formatDate(history.scannedAt)} by ${history.scannedBy || "Name not recorded"} on ${history.workstation || "Workstation not recorded"}`,
       "Changed fields",
     );
-    const differences = portFields.filter(([key]) => changedField(key, history.port, current));
+    const differences = portFields.filter(([key]) =>
+      changedField(key, history.port, current),
+    );
     lines.push(
       ...(differences.length
         ? differences.map(
@@ -1089,9 +1170,12 @@ async function copyPortResults() {
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    $("copyPortResultsBtn").textContent = "Copied";
+    $("copyPortResultsBtn").innerHTML =
+      `${iconMarkup("check-circle")}<span>Copied</span>`;
     setTimeout(() => {
-      if ($("copyPortResultsBtn")) $("copyPortResultsBtn").textContent = "Copy results";
+      if ($("copyPortResultsBtn"))
+        $("copyPortResultsBtn").innerHTML =
+          `${iconMarkup("clipboard-document")}<span>Copy results</span>`;
     }, 1500);
   } catch {
     notice("Could not copy results to the clipboard.", "error");
@@ -1111,7 +1195,7 @@ function renderPortComparison() {
     portFields
       .map(([key, label]) => {
         const changed = compareTo && changedField(key, compareTo, port);
-        return `<div class="port-list-row ${changed ? "value-changed" : ""}"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(portValueText(port, key))}</dd>${changed ? '<span class="change-marker">Changed</span>' : ""}</div>`;
+        return `<div class="port-list-row ${changed ? "value-changed" : ""}"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(portValueText(port, key))}${changed ? '<span class="change-marker">Changed</span>' : ""}</dd></div>`;
       })
       .join("");
   const selector =
@@ -1119,7 +1203,7 @@ function renderPortComparison() {
       ? `<label class="port-selector">Captured switch port<select id="capturedPortSelect">${state.ports.map((port, i) => `<option value="${i}" ${i === state.selectedPort ? "selected" : ""}>${escapeHtml(port.switchName || port.chassisId || "Unnamed switch")} · ${escapeHtml(port.port || "Unknown port")}</option>`).join("")}</select></label>`
       : "";
   $("results").innerHTML =
-    `<section class="port-dashboard">${selector}<div class="port-result-heading"><div><span class="workspace-label">Current capture</span><h3>${escapeHtml(current.switchName || "Switch name not observed")}</h3><p>Port ${escapeHtml(current.port || "not observed")} · ${escapeHtml(formatDate(state.result?.completedAt))}</p></div><div class="port-result-actions"><button id="copyPortResultsBtn" class="button small" type="button">Copy results</button>${history ? '<button id="closeComparisonBtn" class="button small" type="button">Close comparison</button>' : '<span class="badge success">Current capture</span>'}</div></div>
+    `<section class="port-dashboard">${selector}<div class="port-result-heading"><div><span class="workspace-label">Current capture</span><h3>${escapeHtml(current.switchName || "Switch name not observed")}</h3><p>Port ${escapeHtml(current.port || "not observed")} · ${escapeHtml(formatDate(state.result?.completedAt))}</p></div><div class="port-result-actions"><button id="copyPortResultsBtn" class="button small" type="button">${iconMarkup("clipboard-document")}<span>Copy results</span></button>${history ? `<button id="closeComparisonBtn" class="button small" type="button">${iconMarkup("x-mark")}<span>Close comparison</span></button>` : '<span class="badge success">Current capture</span>'}</div></div>
     ${history ? `<div class="comparison-status" role="status">${differences.length ? plural(differences.length, "changed field") : "No confirmed value changes"} compared with ${escapeHtml(formatDate(history.scannedAt))}.</div><div class="port-side-by-side"><section class="port-list-panel"><h4>Previous</h4><p>${escapeHtml(formatDate(history.scannedAt))} · ${escapeHtml(history.scannedBy || "Name not recorded")} · ${escapeHtml(history.workstation || "Workstation not recorded")}</p><dl>${listRows(history.port, current)}</dl></section><section class="port-list-panel"><h4>Current</h4><p>${escapeHtml(formatDate(state.result?.completedAt))} · ${escapeHtml(state.currentEvidence?.displayName || state.currentEvidence?.userName || "Name not recorded")}</p><dl>${listRows(current, history.port)}</dl></section></div>` : `<dl class="port-list">${listRows(current)}</dl>`}
     ${current.conflicts?.length ? `<div class="conflict"><strong>Conflicting advertised values</strong><ul>${current.conflicts.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}
     ${history ? '<p class="comparison-note">Only values observed in both captures are highlighted as changed. Missing values do not confirm a configuration change.</p>' : ""}</section>`;
@@ -1180,9 +1264,9 @@ const settingFields = {
   adminManagedCacheEncryption: "adminManagedCacheEncryptionInput",
 };
 const settingsDefaults = {
-  storageMode: "local-nas-mirror",
+  storageMode: "nas-only-encrypted-cache",
   localCachePath: "",
-  cacheExpirationHours: 24,
+  cacheExpirationHours: 168,
   nasSyncIntervalMinutes: 60,
   adminManagedCacheEncryption: true,
 };
@@ -1207,11 +1291,16 @@ function renderAdminWorkspace() {
     modes[state.settings?.storageMode] || "Local history";
   $("adminArchiveRepository").textContent =
     state.settings?.archiveMirrorPath || "No archive folder configured";
-  $("adminReviewTabCount").textContent = state.adminReviews.filter((r) => r.status === "Pending review" || r.status === "New identity").length;
+  $("adminReviewTabCount").textContent = state.adminReviews.filter(
+    (r) => r.status === "Pending review" || r.status === "New identity",
+  ).length;
   renderSwitchInventory();
 }
 function showAdminTab(name) {
-  if (!["accounts", "general", "reviews", "inventory", "technical"].includes(name)) name = "accounts";
+  if (
+    !["accounts", "general", "reviews", "inventory", "technical"].includes(name)
+  )
+    name = "accounts";
   state.activeAdminTab = name;
   if (name === "inventory") renderSwitchInventory();
   if (name === "technical") window.JackPeekTechnicalReview?.load();
@@ -1231,8 +1320,12 @@ function renderSwitchInventory() {
   const statusFilter = $("inventoryStatusFilter")?.value || "all";
   const changesOnly = Boolean($("inventoryChangesFilter")?.checked);
   const pendingOnly = Boolean($("inventoryPendingFilter")?.checked);
-  const entries = state.ledger.map((item) => item.entry || item).filter((entry) => entry.evidenceId);
-  const reportsById = new Map(state.reports.map((report) => [report.evidenceId, report]));
+  const entries = state.ledger
+    .map((item) => item.entry || item)
+    .filter((entry) => entry.evidenceId);
+  const reportsById = new Map(
+    state.reports.map((report) => [report.evidenceId, report]),
+  );
   const groups = [];
   const parent = entries.map((_, index) => index);
   const find = (index) => {
@@ -1247,163 +1340,388 @@ function renderSwitchInventory() {
     const b = find(right);
     if (a !== b) parent[b] = a;
   };
-  const identity = (entry) => [entry.switchName, entry.managementIp, entry.switchChassisId].map((value) => {
-    const text = String(value || "").trim().toLocaleLowerCase();
-    return text ? text.replace(/[-:]/g, "") : "";
-  });
+  const identity = (entry) =>
+    [entry.switchName, entry.managementIp, entry.switchChassisId].map(
+      (value) => {
+        const text = String(value || "")
+          .trim()
+          .toLocaleLowerCase();
+        return text ? text.replace(/[-:]/g, "") : "";
+      },
+    );
   const values = entries.map(identity);
   for (let left = 0; left < entries.length; left += 1) {
     for (let right = left + 1; right < entries.length; right += 1) {
-      const matches = values[left].filter((value, index) => value && value === values[right][index]).length;
+      const matches = values[left].filter(
+        (value, index) => value && value === values[right][index],
+      ).length;
       if (matches >= 2) union(left, right);
     }
   }
   entries.forEach((entry, index) => {
     const root = find(index);
     let group = groups[root];
-    if (!group) group = groups[root] = { entries: [], reports: new Map(), names: new Set(), ips: new Set(), macs: new Set(), ports: new Set(), vlans: new Set(), changes: [], pending: false, reviewPending: false };
+    if (!group)
+      group = groups[root] = {
+        entries: [],
+        reports: new Map(),
+        names: new Set(),
+        ips: new Set(),
+        macs: new Set(),
+        ports: new Set(),
+        vlans: new Set(),
+        changes: [],
+        pending: false,
+        reviewPending: false,
+      };
     group.entries.push(entry);
     if (entry.switchName) group.names.add(entry.switchName);
     if (entry.managementIp) group.ips.add(entry.managementIp);
     if (entry.switchChassisId) group.macs.add(entry.switchChassisId);
     if (entry.switchPort) group.ports.add(entry.switchPort);
-    [entry.nativeVlan, entry.voiceVlan].filter((value) => value !== null && value !== undefined).forEach((value) => group.vlans.add(String(value)));
-    const ledgerItem = state.ledger.find((item) => (item.entry || item).ledgerId === entry.ledgerId);
-    (ledgerItem?.changes || []).forEach((change) => group.changes.push({
-      ...change,
-      scannedAt: entry.scannedAt,
-      evidenceId: entry.evidenceId,
-      userName: entry.userName,
-      workstation: entry.workstation,
-      domainName: entry.domainName,
-      userSid: entry.userSid,
-      sha256: reportsById.get(entry.evidenceId)?.sha256,
-      adminStatus: reportsById.get(entry.evidenceId)?.adminReviewRequired ? "Requires review" : "Pending / not reviewed",
-    }));
+    [entry.nativeVlan, entry.voiceVlan]
+      .filter((value) => value !== null && value !== undefined)
+      .forEach((value) => group.vlans.add(String(value)));
+    const ledgerItem = state.ledger.find(
+      (item) => (item.entry || item).ledgerId === entry.ledgerId,
+    );
+    (ledgerItem?.changes || []).forEach((change) =>
+      group.changes.push({
+        ...change,
+        scannedAt: entry.scannedAt,
+        evidenceId: entry.evidenceId,
+        userName: entry.userName,
+        workstation: entry.workstation,
+        domainName: entry.domainName,
+        userSid: entry.userSid,
+        sha256: reportsById.get(entry.evidenceId)?.sha256,
+        adminStatus: reportsById.get(entry.evidenceId)?.adminReviewRequired
+          ? "Requires review"
+          : "Pending / not reviewed",
+      }),
+    );
     const report = reportsById.get(entry.evidenceId);
     if (report) group.reports.set(entry.evidenceId, report);
     if (report?.adminReviewRequired) group.reviewPending = true;
-    if (report?.adminReviewRequired || report?.storageState === "pending-nas-sync") group.pending = true;
+    if (
+      report?.adminReviewRequired ||
+      report?.storageState === "pending-nas-sync"
+    )
+      group.pending = true;
   });
-  const inventory = groups.filter(Boolean).map((group) => {
-    const reports = [...group.reports.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-    const latest = reports[0];
-    const score = latest?.priorReviewFound ? Number(latest.priorReviewMatchScore || 0) : 0;
-    const status = !latest?.priorReviewFound ? { key: "new", label: "New identity", tone: "warning" } : latest.adminReviewRequired ? { key: "review", label: "Requires review", tone: "warning" } : score === 3 ? { key: "confirmed", label: "Identity confirmed", tone: "success" } : { key: "updated", label: "Identity updated", tone: "info" };
-    const searchable = [...group.names, ...group.ips, ...group.macs, ...group.ports, ...group.vlans, ...reports.flatMap((report) => [report.deviceName, report.model, report.platform])].filter(Boolean).join(" ").toLocaleLowerCase();
-    const changed = group.changes.length > 0 || status.key === "updated";
-    const reviewPending = group.reviewPending || status.key === "review";
-    return { ...group, latest, reports, status, changed, reviewPending, searchable, label: [...group.names][0] || [...group.macs][0] || "Unidentified switch" };
-  }).filter((group) => (!search || group.searchable.includes(search)) && (statusFilter === "all" || group.status.key === statusFilter) && (!changesOnly || group.changed) && (!pendingOnly || group.reviewPending)).sort((a, b) => Date.parse(b.latest?.createdAt || 0) - Date.parse(a.latest?.createdAt || 0));
-  $("inventoryCount").textContent = plural(inventory.length, "switch", "switches");
+  const inventory = groups
+    .filter(Boolean)
+    .map((group) => {
+      const reports = [...group.reports.values()].sort(
+        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
+      const latest = reports[0];
+      const score = latest?.priorReviewFound
+        ? Number(latest.priorReviewMatchScore || 0)
+        : 0;
+      const status = !latest?.priorReviewFound
+        ? { key: "new", label: "New identity", tone: "warning" }
+        : latest.adminReviewRequired
+          ? { key: "review", label: "Requires review", tone: "warning" }
+          : score === 3
+            ? { key: "confirmed", label: "Identity confirmed", tone: "success" }
+            : { key: "updated", label: "Identity updated", tone: "info" };
+      const searchable = [
+        ...group.names,
+        ...group.ips,
+        ...group.macs,
+        ...group.ports,
+        ...group.vlans,
+        ...reports.flatMap((report) => [
+          report.deviceName,
+          report.model,
+          report.platform,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase();
+      const changed = group.changes.length > 0 || status.key === "updated";
+      const reviewPending = group.reviewPending || status.key === "review";
+      return {
+        ...group,
+        latest,
+        reports,
+        status,
+        changed,
+        reviewPending,
+        searchable,
+        label:
+          [...group.names][0] || [...group.macs][0] || "Unidentified switch",
+      };
+    })
+    .filter(
+      (group) =>
+        (!search || group.searchable.includes(search)) &&
+        (statusFilter === "all" || group.status.key === statusFilter) &&
+        (!changesOnly || group.changed) &&
+        (!pendingOnly || group.reviewPending),
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(b.latest?.createdAt || 0) -
+        Date.parse(a.latest?.createdAt || 0),
+    );
+  $("inventoryCount").textContent = plural(
+    inventory.length,
+    "switch",
+    "switches",
+  );
   if (!inventory.length) {
-    $("switchInventory").innerHTML = empty("No switches in inventory", "Completed passive reviews will appear here after they are saved.");
+    $("switchInventory").innerHTML = empty(
+      "No switches in inventory",
+      "Completed passive reviews will appear here after they are saved.",
+    );
     return;
   }
-  $("switchInventory").innerHTML = inventory.map((group) => `<article class="inventory-card"><div class="inventory-card-header"><div><span class="workspace-label">${plural(group.reports.length, "review")} · ${plural(group.ports.size, "port")}</span><h3>${escapeHtml(group.label)}</h3></div><span class="badge ${group.status.tone}">${escapeHtml(group.status.label)}</span><button class="info-tip" type="button" title="${escapeHtml(group.status.key === "confirmed" ? "Identity confirmed: all three switch identifiers matched." : group.status.key === "updated" ? "Identity updated: two of three identifiers matched and a change was detected." : group.status.key === "review" ? "Requires review: only one identifier matched or an administrative check is pending." : "New identity: no sufficient match was found in previous evidence.")}" aria-label="Explain identity status">?</button></div><dl class="inventory-facts"><div><dt>Known IP</dt><dd>${escapeHtml([...group.ips].join(", ") || "Not advertised")}</dd></div><div><dt>MAC / chassis ID</dt><dd>${escapeHtml([...group.macs].join(", ") || "Not advertised")}</dd></div><div><dt>Last review</dt><dd>${escapeHtml(formatDate(group.latest?.createdAt))}</dd></div><div><dt>Confidence <button class="info-tip" type="button" title="Confidence is the number of matching identifiers out of three: switch name, management IP, and MAC/chassis ID." aria-label="Explain confidence">?</button></dt><dd>${group.latest?.priorReviewFound ? `${escapeHtml(String(group.latest.priorReviewMatchScore || 0))}/3` : "No prior match"}</dd></div></dl><div class="identity-breakdown"><span><strong>Matched</strong> ${escapeHtml((group.latest?.matchedIdentityFields || []).join(", ") || "None")}</span><span><strong>Changed</strong> ${escapeHtml((group.latest?.changedIdentityFields || []).join(", ") || "None")}</span><span><strong>Not announced</strong> ${escapeHtml((group.latest?.unannouncedIdentityFields || []).join(", ") || "None")}</span></div><div class="inventory-subrow"><div><strong>Observed ports</strong><span>${escapeHtml([...group.ports].join(", ") || "None")}</span></div><div><strong>VLANs</strong><span>${escapeHtml([...group.vlans].join(", ") || "Not advertised")}</span></div><div><strong>Storage</strong><span>${escapeHtml(group.latest?.storageState || "Not recorded")}${group.pending ? " · Review pending" : ""}</span></div></div>${group.changes.length ? `<div class="inventory-changes"><strong>Recent changes</strong>${group.changes.slice(0, 4).map((change) => `<span>${escapeHtml(change.field)}: ${escapeHtml(change.previous || "Not observed")} → ${escapeHtml(change.current || "Not observed")} · ${escapeHtml(formatDate(change.scannedAt))}</span>`).join("")}</div>` : ""}<details><summary>View reviews and evidence</summary><div class="inventory-review-list">${group.reports.map((report) => `<div><span>${escapeHtml(formatDate(report.createdAt))} · ${escapeHtml(report.machineName || "Workstation not recorded")}</span><button class="button small" type="button" data-inventory-report="${escapeHtml(report.evidenceId)}">Open evidence</button></div>`).join("")}</div></details></article>`).join("");
-  document.querySelectorAll("#switchInventory [data-inventory-report]").forEach((button) => {
-    const evidenceId = button.dataset.inventoryReport;
-    const actions = document.createElement("span");
-    actions.className = "inventory-review-actions";
-    [["JSON", `/api/reports/${encodeURIComponent(evidenceId)}/download`], ["HTML", `/reports/${encodeURIComponent(evidenceId)}.html`], ["Package", `/api/reports/${encodeURIComponent(evidenceId)}/package`]].forEach(([label, href]) => {
-      const link = document.createElement("a");
-      link.className = "button small secondary";
-      link.href = href;
-      link.textContent = label;
-      if (label === "HTML") {
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
+  $("switchInventory").innerHTML = inventory
+    .map(
+      (group) =>
+        `<article class="inventory-card"><div class="inventory-card-header"><div><span class="workspace-label">${plural(group.reports.length, "review")} · ${plural(group.ports.size, "port")}</span><h3>${escapeHtml(group.label)}</h3></div><span class="badge ${group.status.tone}">${escapeHtml(group.status.label)}</span><button class="info-tip" type="button" title="${escapeHtml(group.status.key === "confirmed" ? "Identity confirmed: all three switch identifiers matched." : group.status.key === "updated" ? "Identity updated: two of three identifiers matched and a change was detected." : group.status.key === "review" ? "Requires review: only one identifier matched or an administrative check is pending." : "New identity: no sufficient match was found in previous evidence.")}" aria-label="Explain identity status">?</button></div><dl class="inventory-facts"><div><dt>Known IP</dt><dd>${escapeHtml([...group.ips].join(", ") || "Not advertised")}</dd></div><div><dt>MAC / chassis ID</dt><dd>${escapeHtml([...group.macs].join(", ") || "Not advertised")}</dd></div><div><dt>Last review</dt><dd>${escapeHtml(formatDate(group.latest?.createdAt))}</dd></div><div><dt>Confidence <button class="info-tip" type="button" title="Confidence is the number of matching identifiers out of three: switch name, Switch IP, and MAC/chassis ID." aria-label="Explain confidence">?</button></dt><dd>${group.latest?.priorReviewFound ? `${escapeHtml(String(group.latest.priorReviewMatchScore || 0))}/3` : "No prior match"}</dd></div></dl><div class="identity-breakdown"><span><strong>Matched</strong> ${escapeHtml((group.latest?.matchedIdentityFields || []).join(", ") || "None")}</span><span><strong>Changed</strong> ${escapeHtml((group.latest?.changedIdentityFields || []).join(", ") || "None")}</span><span><strong>Not announced</strong> ${escapeHtml((group.latest?.unannouncedIdentityFields || []).join(", ") || "None")}</span></div><div class="inventory-subrow"><div><strong>Observed ports</strong><span>${escapeHtml([...group.ports].join(", ") || "None")}</span></div><div><strong>VLANs</strong><span>${escapeHtml([...group.vlans].join(", ") || "Not advertised")}</span></div><div><strong>Storage</strong><span>${escapeHtml(group.latest?.storageState || "Not recorded")}${group.pending ? " · Review pending" : ""}</span></div></div>${
+          group.changes.length
+            ? `<div class="inventory-changes"><strong>Recent changes</strong>${group.changes
+                .slice(0, 4)
+                .map(
+                  (change) =>
+                    `<span>${escapeHtml(change.field)}: ${escapeHtml(change.previous || "Not observed")} → ${escapeHtml(change.current || "Not observed")} · ${escapeHtml(formatDate(change.scannedAt))}</span>`,
+                )
+                .join("")}</div>`
+            : ""
+        }<details><summary>View reviews and evidence</summary><div class="inventory-review-list">${group.reports.map((report) => `<div><span>${escapeHtml(formatDate(report.createdAt))} · ${escapeHtml(report.machineName || "Workstation not recorded")}</span><button class="button small" type="button" data-inventory-report="${escapeHtml(report.evidenceId)}">Open evidence</button></div>`).join("")}</div></details></article>`,
+    )
+    .join("");
+  document
+    .querySelectorAll("#switchInventory [data-inventory-report]")
+    .forEach((button) => {
+      const evidenceId = button.dataset.inventoryReport;
+      const actions = document.createElement("span");
+      actions.className = "inventory-review-actions";
+      [
+        ["JSON", `/api/reports/${encodeURIComponent(evidenceId)}/download`],
+        ["HTML", `/reports/${encodeURIComponent(evidenceId)}.html`],
+        ["Package", `/api/reports/${encodeURIComponent(evidenceId)}/package`],
+      ].forEach(([label, href]) => {
+        const link = document.createElement("a");
+        link.className = "button small secondary";
+        link.href = href;
+        link.textContent = label;
+        if (label === "HTML") {
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+        }
+        actions.append(link);
+      });
+      button.parentElement.append(actions);
+    });
+  document
+    .querySelectorAll("#switchInventory .inventory-card")
+    .forEach((card, index) => {
+      const group = inventory[index];
+      [
+        [
+          ".inventory-subrow > div:nth-child(3) strong",
+          "Storage shows whether this evidence is local, synchronized to NAS, or waiting for synchronization.",
+        ],
+        [
+          ".inventory-changes > strong",
+          "Recent changes compare this review with the latest compatible evidence. They remain visible while an administrator verifies them.",
+        ],
+      ].forEach(([selector, title]) => {
+        const heading = card.querySelector(selector);
+        if (!heading) return;
+        const help = document.createElement("button");
+        help.className = "info-tip";
+        help.type = "button";
+        help.title = title;
+        help.setAttribute("aria-label", `Explain ${heading.textContent}`);
+        help.textContent = "?";
+        heading.append(help);
+      });
+      const portCell = card.querySelector(
+        ".inventory-subrow > div:first-child span",
+      );
+      const storageCell = card.querySelector(
+        ".inventory-subrow > div:nth-child(3) span",
+      );
+      if (storageCell) {
+        storageCell.textContent = `${storageStateLabel(group.latest?.storageState)}${group.pending ? " · Review pending" : ""}${state.integrity[group.latest?.evidenceId] === false ? " · Integrity warning" : ""}`;
       }
-      actions.append(link);
+      if (!group || !portCell) return;
+      portCell.replaceChildren();
+      [...group.ports].forEach((port) => {
+        const latestPortEntry = group.entries
+          .filter((entry) => entry.switchPort === port && entry.evidenceId)
+          .sort(
+            (a, b) =>
+              Date.parse(b.scannedAt || 0) - Date.parse(a.scannedAt || 0),
+          )[0];
+        if (!latestPortEntry) return;
+        const button = document.createElement("button");
+        button.className = "inventory-port-link";
+        button.type = "button";
+        button.dataset.inventoryReport = latestPortEntry.evidenceId;
+        button.textContent = port;
+        button.title = `Open latest evidence for port ${port}`;
+        portCell.append(button);
+      });
     });
-    button.parentElement.append(actions);
-  });
-  document.querySelectorAll("#switchInventory .inventory-card").forEach((card, index) => {
-    const group = inventory[index];
-    [[".inventory-subrow > div:nth-child(3) strong", "Storage shows whether this evidence is local, synchronized to NAS, or waiting for synchronization."], [".inventory-changes > strong", "Recent changes compare this review with the latest compatible evidence. They remain visible while an administrator verifies them."]].forEach(([selector, title]) => {
-      const heading = card.querySelector(selector);
-      if (!heading) return;
-      const help = document.createElement("button");
-      help.className = "info-tip";
-      help.type = "button";
-      help.title = title;
-      help.setAttribute("aria-label", `Explain ${heading.textContent}`);
-      help.textContent = "?";
-      heading.append(help);
-    });
-    const portCell = card.querySelector(".inventory-subrow > div:first-child span");
-    const storageCell = card.querySelector(".inventory-subrow > div:nth-child(3) span");
-    if (storageCell) {
-      storageCell.textContent = `${storageStateLabel(group.latest?.storageState)}${group.pending ? " · Review pending" : ""}${state.integrity[group.latest?.evidenceId] === false ? " · Integrity warning" : ""}`;
-    }
-    if (!group || !portCell) return;
-    portCell.replaceChildren();
-    [...group.ports].forEach((port) => {
-      const latestPortEntry = group.entries
-        .filter((entry) => entry.switchPort === port && entry.evidenceId)
-        .sort((a, b) => Date.parse(b.scannedAt || 0) - Date.parse(a.scannedAt || 0))[0];
-      if (!latestPortEntry) return;
-      const button = document.createElement("button");
-      button.className = "inventory-port-link";
-      button.type = "button";
-      button.dataset.inventoryReport = latestPortEntry.evidenceId;
-      button.textContent = port;
-      button.title = `Open latest evidence for port ${port}`;
-      portCell.append(button);
-    });
-  });
 }
 async function loadAdminReviews() {
   if (!state.admin.isUnlocked) return;
-  try { state.adminReviews = await request("/api/admin/reviews", { headers: adminHeaders() }); renderAdminReviews(); renderAdminWorkspace(); }
-  catch (error) { $("adminReviewStatus").textContent = error.message; }
+  try {
+    state.adminReviews = await request("/api/admin/reviews", {
+      headers: adminHeaders(),
+    });
+    renderAdminReviews();
+    renderAdminWorkspace();
+  } catch (error) {
+    $("adminReviewStatus").textContent = error.message;
+  }
 }
 async function retryAdminNas() {
   $("retryAdminNasBtn").disabled = true;
+  $("retryAdminNasBtn").setAttribute("aria-busy", "true");
   $("adminReviewStatus").textContent = "Retrying NAS synchronization...";
   try {
     const result = await post("/api/admin/reviews/sync", {}, adminHeaders());
     state.pendingCache = await request("/api/evidence/cache");
-    $("adminReviewStatus").textContent = String(result.uploaded || 0) + " evidence item(s) synchronized.";
+    $("adminReviewStatus").textContent =
+      String(result.uploaded || 0) + " evidence item(s) synchronized.";
     await loadAdminReviews();
   } catch (error) {
     $("adminReviewStatus").textContent = error.message;
   } finally {
     $("retryAdminNasBtn").disabled = false;
+    $("retryAdminNasBtn").setAttribute("aria-busy", "false");
   }
 }
 function renderAdminReviews() {
   const query = $("adminReviewSearch").value.trim().toLowerCase();
   const rows = state.adminReviews.filter((r) => {
-    const isPending = r.status === "Pending review" || r.status === "New identity";
-    const matchesFilter = state.adminReviewFilter === "all" ||
+    const isPending =
+      r.status === "Pending review" || r.status === "New identity";
+    const matchesFilter =
+      state.adminReviewFilter === "all" ||
       (state.adminReviewFilter === "pending" && isPending) ||
-      (state.adminReviewFilter === "change" && (r.matchScore === 1 || r.matchScore === 2)) ||
+      (state.adminReviewFilter === "change" &&
+        (r.matchScore === 1 || r.matchScore === 2)) ||
       (state.adminReviewFilter === "new" && r.matchScore === 0) ||
-      (state.adminReviewFilter === "nas" && r.storageState === "pending-nas-sync") ||
-      (state.adminReviewFilter === "warning" && r.cacheExpiresAt && (new Date(r.cacheExpiresAt) - Date.now()) <= 6 * 3600000);
-    return matchesFilter && [r.switchName, r.managementIp, r.chassisId, r.switchPort, r.workstation, r.user, r.evidenceId, r.status].join(" ").toLowerCase().includes(query);
+      (state.adminReviewFilter === "nas" &&
+        r.storageState === "pending-nas-sync") ||
+      (state.adminReviewFilter === "warning" &&
+        r.cacheExpiresAt &&
+        new Date(r.cacheExpiresAt) - Date.now() <= 6 * 3600000);
+    return (
+      matchesFilter &&
+      [
+        r.switchName,
+        r.managementIp,
+        r.chassisId,
+        r.switchPort,
+        r.workstation,
+        r.user,
+        r.evidenceId,
+        r.status,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
   });
-  const pending = state.adminReviews.filter((r) => r.status === "Pending review" || r.status === "New identity").length;
-  const changes = state.adminReviews.filter((r) => r.matchScore === 1 || r.matchScore === 2).length;
-  const nas = state.adminReviews.filter((r) => r.storageState === "pending-nas-sync").length;
-  const warnings = state.adminReviews.filter((r) => r.cacheExpiresAt && (new Date(r.cacheExpiresAt) - Date.now()) <= 6 * 3600000).length;
-  $("adminReviewSummary").innerHTML = [["Reviews pending", pending, "pending"], ["Identity changes", changes, "change"], ["New identities", state.adminReviews.filter((r) => r.matchScore === 0).length, "new"], ["NAS sync pending", nas, "nas"], ["Cache warnings", warnings, "warning"]].map(([label, value, tone]) => `<button class="review-summary-card ${tone}" type="button" data-review-filter="${tone}"><strong>${value}</strong><span>${label}</span></button>`).join("");
+  const pending = state.adminReviews.filter(
+    (r) => r.status === "Pending review" || r.status === "New identity",
+  ).length;
+  const changes = state.adminReviews.filter(
+    (r) => r.matchScore === 1 || r.matchScore === 2,
+  ).length;
+  const nas = state.adminReviews.filter(
+    (r) => r.storageState === "pending-nas-sync",
+  ).length;
+  const warnings = state.adminReviews.filter(
+    (r) =>
+      r.cacheExpiresAt &&
+      new Date(r.cacheExpiresAt) - Date.now() <= 6 * 3600000,
+  ).length;
+  $("adminReviewSummary").innerHTML = [
+    ["Reviews pending", pending, "pending"],
+    ["Identity changes", changes, "change"],
+    [
+      "New identities",
+      state.adminReviews.filter((r) => r.matchScore === 0).length,
+      "new",
+    ],
+    ["NAS sync pending", nas, "nas"],
+    ["Cache warnings", warnings, "warning"],
+  ]
+    .map(
+      ([label, value, tone]) =>
+        `<button class="review-summary-card ${tone}" type="button" data-review-filter="${tone}"><strong>${value}</strong><span>${label}</span></button>`,
+    )
+    .join("");
   $("adminReviewTabCount").textContent = pending;
-  if (!rows.length) { $("adminReviewRows").innerHTML = empty("No reviews pending", "Identity alerts and NAS cache warnings will appear here."); return; }
-  $("adminReviewRows").innerHTML = `<table><thead><tr><th>Date</th><th>Switch / port</th><th>Match</th><th>Changed</th><th>Storage</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows.map((r) => `<tr class="${state.selectedAdminReview?.evidenceId === r.evidenceId ? "selected-row" : ""}"><td>${escapeHtml(formatDate(r.createdAt))}</td><td><strong>${escapeHtml(r.switchName || "New identity")}</strong><small class="mono">${escapeHtml(r.switchPort || "Port not advertised")}</small></td><td><span class="badge ${r.matchScore >= 2 ? "success" : "warning"}">${r.matchScore}/3</span><small>${escapeHtml((r.matchedFields || []).join(", ") || "none")}</small></td><td>${escapeHtml((r.changedFields || []).join(", ") || "none")}</td><td>${escapeHtml(r.storageState === "pending-nas-sync" ? "NAS pending" : "Stored")}</td><td><span class="badge ${r.status === "Confirmed" ? "success" : r.status === "Rejected" ? "error" : "warning"}">${escapeHtml(r.status)}</span></td><td><button class="button small" type="button" data-admin-review="${escapeHtml(r.evidenceId)}">Review</button></td></tr>`).join("")}</tbody></table>`;
+  if (!rows.length) {
+    $("adminReviewRows").innerHTML = empty(
+      "No reviews pending",
+      "Identity alerts and NAS cache warnings will appear here.",
+    );
+    return;
+  }
+  $("adminReviewRows").innerHTML =
+    `<table><thead><tr><th>Date</th><th>Switch / port</th><th>Match</th><th>Changed</th><th>Storage</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows.map((r) => `<tr class="${state.selectedAdminReview?.evidenceId === r.evidenceId ? "selected-row" : ""}"><td>${escapeHtml(formatDate(r.createdAt))}</td><td><strong>${escapeHtml(r.switchName || "New identity")}</strong><small class="mono">${escapeHtml(r.switchPort || "Port not advertised")}</small></td><td><span class="badge ${r.matchScore >= 2 ? "success" : "warning"}">${r.matchScore}/3</span><small>${escapeHtml((r.matchedFields || []).join(", ") || "none")}</small></td><td>${escapeHtml((r.changedFields || []).join(", ") || "none")}</td><td>${escapeHtml(r.storageState === "pending-nas-sync" ? "NAS pending" : "Stored")}</td><td><span class="badge ${r.status === "Confirmed" ? "success" : r.status === "Rejected" ? "error" : "warning"}">${escapeHtml(r.status)}</span></td><td><button class="button small" type="button" data-admin-review="${escapeHtml(r.evidenceId)}">Review</button></td></tr>`).join("")}</tbody></table>`;
 }
 async function openAdminReview(id) {
-  const detail = $("adminReviewDetail"); detail.innerHTML = '<p role="status">Loading review...</p>';
+  const detail = $("adminReviewDetail");
+  detail.innerHTML = '<p role="status">Loading review...</p>';
   try {
-    const result = await request(`/api/admin/reviews/${encodeURIComponent(id)}`, { headers: adminHeaders() }); state.selectedAdminReview = result.item; const r = result.item; const record = result.record;
-    detail.innerHTML = `<div class="section-heading"><div><span class="workspace-label">Review ${escapeHtml(r.matchScore)}/3</span><h3>${escapeHtml(r.switchName || "New switch identity")}</h3><p>${escapeHtml(r.reason)}</p></div><span class="badge warning">${escapeHtml(r.status)}</span></div><dl class="detail-grid">${field("Management IP", r.managementIp)}${field("Chassis / MAC", r.chassisId)}${field("Port", r.switchPort)}${field("Workstation", r.workstation)}${field("User", r.user || "Not recorded")}${field("SHA-256", r.sha256, "full")}${field("Storage", r.storageState)}${field("NAS expiration", r.cacheExpiresAt ? formatDate(r.cacheExpiresAt) : "Not applicable")}</dl><div class="review-comparison"><h4>Identity comparison</h4><p><strong>Matched:</strong> ${escapeHtml((r.matchedFields || []).join(", ") || "None")}</p><p><strong>Changed:</strong> ${escapeHtml((r.changedFields || []).join(", ") || "None")}</p><p><strong>Not announced:</strong> ${escapeHtml((r.unannouncedFields || []).join(", ") || "None")}</p>${r.priorCreatedAt ? `<p><strong>Previous review:</strong> ${escapeHtml(formatDate(r.priorCreatedAt))}</p>` : ""}</div><div class="review-actions"><a class="button small" href="/api/reports/${encodeURIComponent(r.evidenceId)}/download">Open evidence</a><a class="button small" href="/api/reports/${encodeURIComponent(r.evidenceId)}/package">Export package</a><button class="button small" type="button" data-verify-admin-review="${escapeHtml(r.evidenceId)}">Verify SHA-256</button></div><form id="adminReviewDecisionForm" class="review-decision-form"><label>Administrator comment<textarea id="adminReviewComment" rows="3" placeholder="Add context for the audit record"></textarea></label><div class="review-actions"><button class="button primary" type="submit" data-decision="Confirmed">Confirm identity</button><button class="button secondary" type="submit" data-decision="Review later">Review later</button><button class="button danger" type="submit" data-decision="Rejected">Reject identity</button></div><p id="adminReviewDecisionStatus" class="inline-status" role="status"></p></form>`;
-    $("adminReviewDecisionForm").addEventListener("submit", (event) => { event.preventDefault(); void saveAdminReviewDecision(r.evidenceId, event.submitter.dataset.decision); });
-    detail.querySelector("[data-verify-admin-review]").addEventListener("click", async (event) => { event.target.disabled = true; const v = await request(`/api/reports/${encodeURIComponent(r.evidenceId)}/verify`); event.target.textContent = v.valid ? "SHA-256 verified" : "SHA-256 mismatch"; });
-  } catch (error) { detail.innerHTML = empty("Review unavailable", error.message); }
+    const result = await request(
+      `/api/admin/reviews/${encodeURIComponent(id)}`,
+      { headers: adminHeaders() },
+    );
+    state.selectedAdminReview = result.item;
+    const r = result.item;
+    const record = result.record;
+    detail.innerHTML = `<div class="section-heading"><div><span class="workspace-label">Review ${escapeHtml(r.matchScore)}/3</span><h3>${escapeHtml(r.switchName || "New switch identity")}</h3><p>${escapeHtml(r.reason)}</p></div><span class="badge warning">${escapeHtml(r.status)}</span></div><dl class="detail-grid">${field("Switch IP", r.managementIp)}${field("Chassis / MAC", r.chassisId)}${field("Port", r.switchPort)}${field("Workstation", r.workstation)}${field("User", r.user || "Not recorded")}${field("SHA-256", r.sha256, "full")}${field("Storage", r.storageState)}${field("NAS expiration", r.cacheExpiresAt ? formatDate(r.cacheExpiresAt) : "Not applicable")}</dl><div class="review-comparison"><h4>Identity comparison</h4><p><strong>Matched:</strong> ${escapeHtml((r.matchedFields || []).join(", ") || "None")}</p><p><strong>Changed:</strong> ${escapeHtml((r.changedFields || []).join(", ") || "None")}</p><p><strong>Not announced:</strong> ${escapeHtml((r.unannouncedFields || []).join(", ") || "None")}</p>${r.priorCreatedAt ? `<p><strong>Previous review:</strong> ${escapeHtml(formatDate(r.priorCreatedAt))}</p>` : ""}</div><div class="review-actions"><a class="button small" href="/api/reports/${encodeURIComponent(r.evidenceId)}/download">Open evidence</a><a class="button small" href="/api/reports/${encodeURIComponent(r.evidenceId)}/package">Export package</a><button class="button small" type="button" data-verify-admin-review="${escapeHtml(r.evidenceId)}">Verify SHA-256</button></div><form id="adminReviewDecisionForm" class="review-decision-form"><label>Administrator comment<textarea id="adminReviewComment" rows="3" placeholder="Add context for the audit record"></textarea></label><div class="review-actions"><button class="button primary" type="submit" data-decision="Confirmed">Confirm identity</button><button class="button secondary" type="submit" data-decision="Review later">Review later</button><button class="button danger" type="submit" data-decision="Rejected">Reject identity</button></div><p id="adminReviewDecisionStatus" class="inline-status" role="status"></p></form>`;
+    $("adminReviewDecisionForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      void saveAdminReviewDecision(
+        r.evidenceId,
+        event.submitter.dataset.decision,
+      );
+    });
+    detail
+      .querySelector("[data-verify-admin-review]")
+      .addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        const v = await request(
+          `/api/reports/${encodeURIComponent(r.evidenceId)}/verify`,
+        );
+        event.target.textContent = v.valid
+          ? "SHA-256 verified"
+          : "SHA-256 mismatch";
+      });
+  } catch (error) {
+    detail.innerHTML = empty("Review unavailable", error.message);
+  }
 }
 async function saveAdminReviewDecision(id, status) {
-  const statusEl = $("adminReviewDecisionStatus"); try { await post(`/api/admin/reviews/${encodeURIComponent(id)}/decision`, { status, comment: $("adminReviewComment").value }, adminHeaders()); statusEl.textContent = "Decision saved to the audit log."; await loadAdminReviews(); await openAdminReview(id); } catch (error) { statusEl.textContent = error.message; }
+  const statusEl = $("adminReviewDecisionStatus");
+  try {
+    await post(
+      `/api/admin/reviews/${encodeURIComponent(id)}/decision`,
+      { status, comment: $("adminReviewComment").value },
+      adminHeaders(),
+    );
+    statusEl.textContent = "Decision saved to the audit log.";
+    await loadAdminReviews();
+    await openAdminReview(id);
+  } catch (error) {
+    statusEl.textContent = error.message;
+  }
 }
 async function loadAccounts() {
   try {
@@ -1441,6 +1759,7 @@ async function approveAccount(event) {
   event.preventDefault();
   if (!$("accountForm").reportValidity()) return;
   $("approveAccountBtn").disabled = true;
+  $("approveAccountBtn").setAttribute("aria-busy", "true");
   try {
     await post(
       "/api/admin/accounts",
@@ -1458,6 +1777,7 @@ async function approveAccount(event) {
     $("accountFormStatus").textContent = error.message;
   } finally {
     $("approveAccountBtn").disabled = false;
+    $("approveAccountBtn").setAttribute("aria-busy", "false");
   }
 }
 
@@ -1537,6 +1857,7 @@ async function loadSession() {
     renderSettingsStatus();
     renderAdminWorkspace();
     updateAdapter();
+    if (state.signedIn) void loadNasHealth();
     return true;
   } catch (error) {
     $("signInStatus").textContent = error.message;
@@ -1638,6 +1959,7 @@ async function unlockAdminFromPortal(event) {
   event.preventDefault();
   if (!$("adminPortalForm").reportValidity()) return;
   $("adminPortalSubmitBtn").disabled = true;
+  $("adminPortalSubmitBtn").setAttribute("aria-busy", "true");
   $("adminPortalStatus").textContent = "Checking administrator access…";
   try {
     const password = $("adminPortalPasswordInput").value;
@@ -1664,12 +1986,14 @@ async function unlockAdminFromPortal(event) {
       : error.message;
   } finally {
     $("adminPortalSubmitBtn").disabled = false;
+    $("adminPortalSubmitBtn").setAttribute("aria-busy", "false");
   }
 }
 async function saveAdminPassword(event) {
   event.preventDefault();
   if (!$("adminPasswordForm").reportValidity()) return;
   $("saveAdminPasswordBtn").disabled = true;
+  $("saveAdminPasswordBtn").setAttribute("aria-busy", "true");
   try {
     await post("/api/admin/password", {
       currentPassword: $("currentAdminPasswordInput").value,
@@ -1680,15 +2004,18 @@ async function saveAdminPassword(event) {
     $("adminPasswordStatus").textContent = error.message;
   } finally {
     $("saveAdminPasswordBtn").disabled = false;
+    $("saveAdminPasswordBtn").setAttribute("aria-busy", "false");
   }
 }
 
 async function syncPendingCache() {
   $("syncCacheBtn").disabled = true;
+  $("syncCacheBtn").setAttribute("aria-busy", "true");
   $("syncCacheStatus").textContent = "Syncing pending NAS cache...";
   try {
     const result = await post("/api/evidence/sync", {}, adminHeaders());
     state.pendingCache = await request("/api/evidence/cache");
+    await loadNasHealth();
     $("syncCacheStatus").textContent =
       `${result.uploaded || 0} uploaded, ${result.failed || 0} failed, ${result.deletedExpired || 0} expired record removed.`;
     renderAdminWorkspace();
@@ -1697,6 +2024,7 @@ async function syncPendingCache() {
     $("syncCacheStatus").textContent = error.message;
   } finally {
     $("syncCacheBtn").disabled = false;
+    $("syncCacheBtn").setAttribute("aria-busy", "false");
   }
 }
 function handleBrandLogoClick(event) {
@@ -1744,6 +2072,7 @@ async function importLicense() {
 
 async function loadReports() {
   $("refreshReportsBtn").disabled = true;
+  $("refreshReportsBtn").setAttribute("aria-busy", "true");
   $("historyStatus").textContent = "Loading evidence history...";
   try {
     const [reports, ledger] = await Promise.all([
@@ -1772,29 +2101,58 @@ async function loadReports() {
     );
   } finally {
     $("refreshReportsBtn").disabled = false;
+    $("refreshReportsBtn").setAttribute("aria-busy", "false");
   }
 }
 
 function historyFilterConfig(type) {
   return type === "switch"
-    ? { input: "timelineSwitchFilter", menu: "switchFilterMenu", empty: "No switch values yet" }
-    : { input: "timelinePortFilter", menu: "portFilterMenu", empty: "No port values yet" };
+    ? {
+        input: "timelineSwitchFilter",
+        menu: "switchFilterMenu",
+        empty: "No switch values yet",
+      }
+    : {
+        input: "timelinePortFilter",
+        menu: "portFilterMenu",
+        empty: "No port values yet",
+      };
 }
 
 function getHistoryFilterOptions(type) {
-  const ledgerByEvidence = new Map(state.ledger.map((item) => [item.entry?.evidenceId || item.evidenceId, item]));
+  const ledgerByEvidence = new Map(
+    state.ledger.map((item) => [
+      item.entry?.evidenceId || item.evidenceId,
+      item,
+    ]),
+  );
   const values = new Set();
   state.reports.forEach((report) => {
     const ledger = ledgerByEvidence.get(report.evidenceId)?.entry || {};
     const source =
       type === "switch"
-        ? [report.deviceName, ledger.switchName, ledger.switchChassisId, ledger.managementIp]
-        : [report.switchPort, ledger.switchPort, ledger.nativeVlan, ledger.voiceVlan];
+        ? [
+            report.deviceName,
+            ledger.switchName,
+            ledger.switchChassisId,
+            ledger.managementIp,
+          ]
+        : [
+            report.switchPort,
+            ledger.switchPort,
+            ledger.nativeVlan,
+            ledger.voiceVlan,
+          ];
     source
-      .filter((value) => value !== null && value !== undefined && String(value).trim())
+      .filter(
+        (value) =>
+          value !== null && value !== undefined && String(value).trim(),
+      )
       .forEach((value) => values.add(String(value).trim()));
   });
-  return [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  return [...values].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+  );
 }
 
 function renderHistoryFilterMenu(type) {
@@ -1882,19 +2240,50 @@ function renderReports() {
   const query = $("reportSearch").value.trim().toLocaleLowerCase();
   const filter = $("reportFilter")?.value || "all";
   state.reportFilter = filter;
-  const switchQuery = $("timelineSwitchFilter")?.value.trim().toLocaleLowerCase() || "";
-  const portQuery = $("timelinePortFilter")?.value.trim().toLocaleLowerCase() || "";
+  const switchQuery =
+    $("timelineSwitchFilter")?.value.trim().toLocaleLowerCase() || "";
+  const portQuery =
+    $("timelinePortFilter")?.value.trim().toLocaleLowerCase() || "";
   const statusFilter = $("timelineStatusFilter")?.value || "all";
   const from = $("timelineFromFilter")?.value || "";
   const to = $("timelineToFilter")?.value || "";
-  const ledgerByEvidence = new Map(state.ledger.map((item) => [item.entry?.evidenceId || item.evidenceId, item]));
+  const ledgerByEvidence = new Map(
+    state.ledger.map((item) => [
+      item.entry?.evidenceId || item.evidenceId,
+      item,
+    ]),
+  );
   renderHistoryFilterMenu("switch");
   renderHistoryFilterMenu("port");
   const identityState = (r) => {
-    if (!r.priorReviewFound) return { key: "new", label: "New identity", tone: "warning", detail: "No prior switch identity matched this review." };
-    if (r.adminReviewRequired) return { key: "review", label: "Requires review", tone: "warning", detail: `Identity match ${r.priorReviewMatchScore || 1}/3; administrator verification is required.` };
-    if (r.priorReviewMatchScore === 3) return { key: "confirmed", label: "Identity confirmed", tone: "success", detail: "All available switch identity markers matched the previous review." };
-    return { key: "updated", label: "Identity updated", tone: "info", detail: `Identity match ${r.priorReviewMatchScore}/3; the review remains visible while the change is verified.` };
+    if (!r.priorReviewFound)
+      return {
+        key: "new",
+        label: "New identity",
+        tone: "warning",
+        detail: "No prior switch identity matched this review.",
+      };
+    if (r.adminReviewRequired)
+      return {
+        key: "review",
+        label: "Requires review",
+        tone: "warning",
+        detail: `Identity match ${r.priorReviewMatchScore || 1}/3; administrator verification is required.`,
+      };
+    if (r.priorReviewMatchScore === 3)
+      return {
+        key: "confirmed",
+        label: "Identity confirmed",
+        tone: "success",
+        detail:
+          "All available switch identity markers matched the previous review.",
+      };
+    return {
+      key: "updated",
+      label: "Identity updated",
+      tone: "info",
+      detail: `Identity match ${r.priorReviewMatchScore}/3; the review remains visible while the change is verified.`,
+    };
   };
   const reports = state.reports.filter((r) => {
     const isEmpty = Number(r.observations || 0) === 0;
@@ -1903,8 +2292,22 @@ function renderReports() {
     const needsReview = Boolean(r.adminReviewRequired);
     const status = identityState(r);
     const ledger = ledgerByEvidence.get(r.evidenceId)?.entry || {};
-    const identityText = [r.deviceName, ledger.switchName, ledger.switchChassisId, ledger.managementIp].join(" ").toLocaleLowerCase();
-    const portText = [r.switchPort, ledger.switchPort, ledger.nativeVlan, ledger.voiceVlan].join(" ").toLocaleLowerCase();
+    const identityText = [
+      r.deviceName,
+      ledger.switchName,
+      ledger.switchChassisId,
+      ledger.managementIp,
+    ]
+      .join(" ")
+      .toLocaleLowerCase();
+    const portText = [
+      r.switchPort,
+      ledger.switchPort,
+      ledger.nativeVlan,
+      ledger.voiceVlan,
+    ]
+      .join(" ")
+      .toLocaleLowerCase();
     const date = String(r.createdAt || "").slice(0, 10);
     const matchesFilter =
       filter === "all" ||
@@ -1913,23 +2316,26 @@ function renderReports() {
       (filter === "error" && hasError) ||
       (filter === "pending" && pending) ||
       (filter === "review" && needsReview);
-    return matchesFilter &&
+    return (
+      matchesFilter &&
       (statusFilter === "all" || status.key === statusFilter) &&
       (!switchQuery || identityText.includes(switchQuery)) &&
       (!portQuery || portText.includes(portQuery)) &&
       (!from || date >= from) &&
-      (!to || date <= to) && [
-      r.deviceName,
-      r.switchPort,
-      r.machineName,
-      r.storageState,
-      r.adminReviewReason,
-      r.evidenceId,
-      formatDate(r.createdAt),
-    ].some((v) =>
-      String(v || "")
-        .toLocaleLowerCase()
-        .includes(query),
+      (!to || date <= to) &&
+      [
+        r.deviceName,
+        r.switchPort,
+        r.machineName,
+        r.storageState,
+        r.adminReviewReason,
+        r.evidenceId,
+        formatDate(r.createdAt),
+      ].some((v) =>
+        String(v || "")
+          .toLocaleLowerCase()
+          .includes(query),
+      )
     );
   });
   $("reportCount").textContent = query
@@ -1947,19 +2353,51 @@ function renderReports() {
   const groups = new Map();
   reports.forEach((r) => {
     const ledger = ledgerByEvidence.get(r.evidenceId)?.entry || {};
-    const groupKey = (r.deviceName || ledger.switchChassisId || "Unidentified switch").trim().toLocaleLowerCase();
-    if (!groups.has(groupKey)) groups.set(groupKey, { label: r.deviceName || ledger.switchChassisId || "Unidentified switch", items: [] });
-    groups.get(groupKey).items.push({ report: r, ledger, status: identityState(r), changes: ledgerByEvidence.get(r.evidenceId)?.changes || [] });
+    const groupKey = (
+      r.deviceName ||
+      ledger.switchChassisId ||
+      "Unidentified switch"
+    )
+      .trim()
+      .toLocaleLowerCase();
+    if (!groups.has(groupKey))
+      groups.set(groupKey, {
+        label: r.deviceName || ledger.switchChassisId || "Unidentified switch",
+        items: [],
+      });
+    groups
+      .get(groupKey)
+      .items.push({
+        report: r,
+        ledger,
+        status: identityState(r),
+        changes: ledgerByEvidence.get(r.evidenceId)?.changes || [],
+      });
   });
-  $("reports").innerHTML = `<div class="timeline" aria-label="Evidence timeline">${[...groups.values()].map((group) => `<section class="timeline-group"><div class="timeline-group-heading"><span class="workspace-label">Switch history</span><h2>${escapeHtml(group.label)}</h2><span class="secondary-text">${plural(group.items.length, "review")}</span></div><div class="timeline-events">${group.items.map(({ report: r, ledger, status, changes }) => {
-    const reviewer = userDetailsAllowed() ? (ledger.displayName || ledger.userName || r.userName || "Not recorded") : "Windows user hidden by policy";
-    const changeMarkup = changes.length ? `<ul class="timeline-changes">${changes.map((c) => `<li><strong>${escapeHtml(c.field)}</strong><span>${escapeHtml(c.previous || "Not observed")} → ${escapeHtml(c.current || "Not observed")} · ${escapeHtml(formatDate(c.scannedAt))}</span></li>`).join("")}</ul>` : `<p class="timeline-muted">No confirmed value changes from the previous review.</p>`;
-    const matched = r.matchedIdentityFields || [];
-    const changed = r.changedIdentityFields || [];
-    const unannounced = r.unannouncedIdentityFields || [];
-    const identityDetails = `<div class="identity-breakdown"><span><strong>Matched</strong> ${escapeHtml(matched.join(", ") || "None")}</span><span><strong>Changed</strong> ${escapeHtml(changed.join(", ") || "None")}</span><span><strong>Not announced</strong> ${escapeHtml(unannounced.join(", ") || "None")}</span></div>`;
-    return `<article class="timeline-event ${status.key}"><div class="timeline-marker" aria-hidden="true"></div><div class="timeline-event-body"><div class="timeline-event-header"><div><time datetime="${escapeHtml(r.createdAt)}">${escapeHtml(formatDate(r.createdAt))}</time><h3>${escapeHtml(r.switchPort || ledger.switchPort || "Port not advertised")}</h3></div><span class="badge ${status.tone}">${escapeHtml(status.label)}</span></div><p class="timeline-meta"><strong>${escapeHtml(reviewer)}</strong> · ${escapeHtml(ledger.workstation || r.machineName || "Workstation not recorded")}${userDetailsAllowed() ? ` · ${escapeHtml(ledger.domainName || "Local account")}` : ""}</p><p class="timeline-meta">${escapeHtml(ledger.managementIp || "IP not advertised")} · ${escapeHtml(ledger.switchChassisId || "MAC not advertised")} · ${escapeHtml(ledger.nativeVlan ? `VLAN ${ledger.nativeVlan}` : "VLAN not advertised")}</p><details><summary>View identity comparison and evidence</summary><p class="timeline-status-copy">${escapeHtml(status.detail)}</p>${identityDetails}${changeMarkup}<div class="timeline-actions"><button class="button small" type="button" data-report="${escapeHtml(r.evidenceId)}">Review evidence</button><span class="timeline-integrity">SHA-256 ${escapeHtml(r.sha256 ? r.sha256.slice(0, 12) + "…" : "not available")} · ${escapeHtml(storageStateLabel(r.storageState))}${state.integrity[r.evidenceId] === false ? " · Integrity warning" : ""}</span></div></details></div></article>`;
-  }).join("")}</div></section>`).join("")}</div>`;
+  $("reports").innerHTML =
+    `<div class="timeline" aria-label="Evidence timeline">${[...groups.values()]
+      .map(
+        (group) =>
+          `<section class="timeline-group"><div class="timeline-group-heading"><span class="workspace-label">Switch history</span><h2>${escapeHtml(group.label)}</h2><span class="secondary-text">${plural(group.items.length, "review")}</span></div><div class="timeline-events">${group.items
+            .map(({ report: r, ledger, status, changes }) => {
+              const reviewer = userDetailsAllowed()
+                ? ledger.displayName ||
+                  ledger.userName ||
+                  r.userName ||
+                  "Not recorded"
+                : "Windows user hidden by policy";
+              const changeMarkup = changes.length
+                ? `<ul class="timeline-changes">${changes.map((c) => `<li><strong>${escapeHtml(c.field)}</strong><span>${escapeHtml(c.previous || "Not observed")} → ${escapeHtml(c.current || "Not observed")} · ${escapeHtml(formatDate(c.scannedAt))}</span></li>`).join("")}</ul>`
+                : `<p class="timeline-muted">No confirmed value changes from the previous review.</p>`;
+              const matched = r.matchedIdentityFields || [];
+              const changed = r.changedIdentityFields || [];
+              const unannounced = r.unannouncedIdentityFields || [];
+              const identityDetails = `<div class="identity-breakdown"><span><strong>Matched</strong> ${escapeHtml(matched.join(", ") || "None")}</span><span><strong>Changed</strong> ${escapeHtml(changed.join(", ") || "None")}</span><span><strong>Not announced</strong> ${escapeHtml(unannounced.join(", ") || "None")}</span></div>`;
+              return `<article class="timeline-event ${status.key}"><div class="timeline-marker" aria-hidden="true"></div><div class="timeline-event-body"><div class="timeline-event-header"><div><time datetime="${escapeHtml(r.createdAt)}">${escapeHtml(formatDate(r.createdAt))}</time><h3>${escapeHtml(r.switchPort || ledger.switchPort || "Port not advertised")}</h3></div><span class="badge ${status.tone}">${escapeHtml(status.label)}</span></div><p class="timeline-meta"><strong>${escapeHtml(reviewer)}</strong> · ${escapeHtml(ledger.workstation || r.machineName || "Workstation not recorded")}${userDetailsAllowed() ? ` · ${escapeHtml(ledger.domainName || "Local account")}` : ""}</p><p class="timeline-meta">${escapeHtml(ledger.managementIp || "IP not advertised")} · ${escapeHtml(ledger.switchChassisId || "MAC not advertised")} · ${escapeHtml(ledger.nativeVlan ? `VLAN ${ledger.nativeVlan}` : "VLAN not advertised")}</p><details><summary>View identity comparison and evidence</summary><p class="timeline-status-copy">${escapeHtml(status.detail)}</p>${identityDetails}${changeMarkup}<div class="timeline-actions"><button class="button small" type="button" data-report="${escapeHtml(r.evidenceId)}">Review evidence</button><span class="timeline-integrity">SHA-256 ${escapeHtml(r.sha256 ? r.sha256.slice(0, 12) + "…" : "not available")} · ${escapeHtml(storageStateLabel(r.storageState))}${state.integrity[r.evidenceId] === false ? " · Integrity warning" : ""}</span></div></details></div></article>`;
+            })
+            .join("")}</div></section>`,
+      )
+      .join("")}</div>`;
 }
 async function openReport(id) {
   const generation = ++state.reportRequest;
@@ -1979,7 +2417,8 @@ async function openReport(id) {
     storageNotice.textContent = `Storage: ${storageStateLabel(record.storageState)}. The original evidence file is read-only.`;
     $("verificationStatus").before(storageNotice);
     if (!userDetailsAllowed()) {
-      const detailFields = $("reportDetail").querySelector(".detail-grid")?.children || [];
+      const detailFields =
+        $("reportDetail").querySelector(".detail-grid")?.children || [];
       [3, 4, 5, 8].forEach((index) => detailFields[index]?.remove());
     }
     $("verifyReportBtn").addEventListener("click", () =>
@@ -2046,7 +2485,9 @@ $("captureForm").addEventListener("submit", startScan);
 $("brandLogo").addEventListener("click", handleBrandLogoClick);
 $("refreshBtn").addEventListener("click", loadAdapters);
 $("adapterSelect").addEventListener("change", updateAdapter);
-$("adapterSelect").addEventListener("change", startLiveTraffic);
+$("speedTestStartBtn").addEventListener("click", () => startSpeedTest(true));
+$("speedTestCancelBtn").addEventListener("click", stopSpeedTest);
+window.addEventListener("pagehide", stopSpeedTest);
 $("adapterMenuButton").addEventListener("click", toggleAdapterMenu);
 $("adapterMenu").addEventListener("click", (event) => {
   const option = event.target.closest("[data-adapter-id]");
@@ -2098,10 +2539,29 @@ $("adminPortalCancelBtn").addEventListener("click", hideAdminLoginPage);
 $("adminPasswordForm").addEventListener("submit", saveAdminPassword);
 $("openAccountDialogBtn").addEventListener("click", showAccountDialog);
 $("cancelAccountDialogBtn").addEventListener("click", hideAccountDialog);
-$("openAdminPasswordDialogBtn").addEventListener("click", showAdminPasswordDialog);
-$("cancelAdminPasswordDialogBtn").addEventListener("click", hideAdminPasswordDialog);
+$("openAdminPasswordDialogBtn").addEventListener(
+  "click",
+  showAdminPasswordDialog,
+);
+$("cancelAdminPasswordDialogBtn").addEventListener(
+  "click",
+  hideAdminPasswordDialog,
+);
 $("lockAdminBtn").addEventListener("click", signOut);
 $("syncCacheBtn").addEventListener("click", syncPendingCache);
+$("nasHealthBtn").addEventListener("click", () => {
+  state.nasHealthOpen = !state.nasHealthOpen;
+  renderNasHealth();
+  if (state.nasHealthOpen) void loadNasHealth();
+});
+$("nasRefreshHealthBtn").addEventListener("click", loadNasHealth);
+$("nasForceUploadBtn").addEventListener("click", forceNasUpload);
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("#nasHealthDock")) {
+    state.nasHealthOpen = false;
+    renderNasHealth();
+  }
+});
 $("refreshAdminReviewsBtn").addEventListener("click", loadAdminReviews);
 $("retryAdminNasBtn").addEventListener("click", retryAdminNas);
 $("adminReviewSearch").addEventListener("input", renderAdminReviews);
@@ -2153,7 +2613,8 @@ $("reportFilter").addEventListener("change", renderReports);
   menu?.addEventListener("click", (event) => {
     event.stopPropagation();
     const option = event.target.closest("[data-history-filter-value]");
-    if (option) selectHistoryFilterValue(type, option.dataset.historyFilterValue || "");
+    if (option)
+      selectHistoryFilterValue(type, option.dataset.historyFilterValue || "");
   });
   menu?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -2279,11 +2740,13 @@ $("inventoryChangesFilter")?.addEventListener("change", renderSwitchInventory);
 $("inventoryPendingFilter")?.addEventListener("change", renderSwitchInventory);
 $("refreshInventoryBtn")?.addEventListener("click", async () => {
   $("refreshInventoryBtn").disabled = true;
+  $("refreshInventoryBtn").setAttribute("aria-busy", "true");
   try {
     await loadReports();
     renderSwitchInventory();
   } finally {
     $("refreshInventoryBtn").disabled = false;
+    $("refreshInventoryBtn").setAttribute("aria-busy", "false");
   }
 });
 $("switchInventory")?.addEventListener("click", (event) => {

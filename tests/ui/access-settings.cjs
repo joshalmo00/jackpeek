@@ -129,6 +129,10 @@ const base = process.env.JACKPEEK_TEST_URL || "http://127.0.0.1:52523";
         path === "/api/evidence/cache"
       )
         body = [];
+      else if (path === "/api/nas/health")
+        body = { state: "healthy", connected: true, archivePath: "DEMO/NAS", retainedLocalLogs: 0, pendingUploadLogs: 0, expiringSoonLogs: 0, nextExpiration: null, lastError: null, pending: [] };
+      else if (path === "/api/nas/sync")
+        body = { sync: { pendingBefore: 0, uploaded: 0, deletedExpired: 0, failed: 0, lastError: null }, health: { state: "healthy", connected: true, archivePath: "DEMO/NAS", retainedLocalLogs: 0, pendingUploadLogs: 0, expiringSoonLogs: 0, nextExpiration: null, lastError: null, pending: [] } };
       else if (path === "/api/access/logout") fixture.admin.isUnlocked = false;
       else throw new Error("Unexpected API: " + path);
       await route.fulfill({

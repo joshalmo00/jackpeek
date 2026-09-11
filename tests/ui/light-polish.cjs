@@ -3,8 +3,9 @@ const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const axe = require('axe-core');
 const root = path.resolve('src/NetworkPortAnalyzer.Web/wwwroot');
-const output = path.resolve('.ui-test/light-polish');
+const output = path.resolve('.ui-test/redesign');
 fs.mkdirSync(output, { recursive: true });
 const base = 'http://127.0.0.1:49999';
 const switchName = 'DEMO-EastTower-Distribution-Stack-01.example.test';
@@ -21,9 +22,15 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
   page.setDefaultTimeout(7000);
   const errors = [], unknown = [];
   page.on('pageerror', e => errors.push(e.message));
-  let admin = true, approved = true, driver = true;
+  let admin = true, approved = true, driver = true, speedRequests = 0;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.origin === 'https://speed.cloudflare.com') {
+      speedRequests++;
+      // This suite exercises the blocked-service experience. The speed engine
+      // tests separately validate throughput, stream sizes and cancellation.
+      return route.abort('internetdisconnected');
+    }
     assert.equal(url.origin, base, 'Unexpected external request');
     let body;
     if (url.pathname.startsWith('/api/')) {
@@ -33,7 +40,9 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
       else if (url.pathname.endsWith('/traffic')) body = { capturedAt: new Date().toISOString(), bytesReceived: 1000000, bytesSent: 500000 };
       else if (url.pathname === '/api/reports') body = reports;
       else if (url.pathname === '/api/ports/log') body = ledger;
-      else if (url.pathname === '/api/ports/history') body = { entries: reports.map(r => ({ evidenceId: r.evidenceId, scannedAt: r.createdAt, scannedBy: r.userName, workstation: r.machineName, port })), warning: null };
+      else if (url.pathname === '/api/nas/health') body = { state: 'healthy', connected: true, archivePath: 'DEMO/NAS', retainedLocalLogs: 2, pendingUploadLogs: 0, expiringSoonLogs: 0, nextExpiration: null, lastError: null, pending: [] };
+      else if (url.pathname === '/api/nas/sync') body = { sync: { pendingBefore: 0, uploaded: 0, deletedExpired: 0, failed: 0, lastError: null }, health: { state: 'healthy', connected: true, archivePath: 'DEMO/NAS', retainedLocalLogs: 2, pendingUploadLogs: 0, expiringSoonLogs: 0, nextExpiration: null, lastError: null, pending: [] } };
+      else if (url.pathname === '/api/ports/history') body = { entries: reports.map(r => ({ evidenceId: r.evidenceId, scannedAt: r.createdAt, scannedBy: r.userName, workstation: r.machineName, port: {...port, nativeVlan: 100} })), warning: null };
       else if (url.pathname === '/api/admin/accounts') body = [];
       else if (url.pathname === '/api/admin/reviews') body = [];
       else if (url.pathname === '/api/scans') body = { scanId: 'demo-0' };
@@ -55,17 +64,34 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
     assert.equal(result.dark, 'light', `${name} color scheme`);
     console.log(`PASS ${name}`);
   }
+  async function accessible(name) {
+    await page.addScriptTag({ content: axe.source });
+    const results = await page.evaluate(async () => {
+      const result = await axe.run(document, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});
+      return result.violations.map(v => ({id:v.id, impact:v.impact, nodes:v.nodes.map(n => n.target)}));
+    });
+    assert.deepEqual(results, [], `${name}: accessibility`);
+    console.log(`PASS ${name} accessibility`);
+  }
   try {
     await page.goto(base);
     await page.locator('#windowsSignInBtn:not(:disabled)').waitFor();
+    assert.equal(speedRequests, 0, 'No Internet test before sign-in');
+    assert.match(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily), /Arial|Helvetica Neue|Segoe UI/i, 'App uses the Arial-like system font stack');
     await shot('login');
+    await accessible('sign-in');
     await page.locator('#administratorSignInBtn').click();
     await fit('administrator login');
     await shot('admin-login');
     await page.locator('#adminPortalCancelBtn').click();
     await page.locator('#windowsSignInBtn').click();
     await page.locator('#scanBtn:not(:disabled)').waitFor();
-    assert(await page.locator('#adapterDescription').isHidden(), 'Duplicate description hidden');
+    assert.equal(await page.locator('#liveTrafficPanel').count(), 0, 'Traffic counters do not replace speed test');
+    await page.locator('#speedTestPanel[data-phase="error"]').waitFor();
+    assert(speedRequests > 0, 'Test starts automatically after sign-in');
+    assert.equal(await page.locator('#speedUpload').textContent(), '–', 'Missing upload is not zero');
+    assert.equal(await page.locator('#speedTestTitle').textContent(), 'Speed Test');
+    assert.equal(await page.locator('#speedChart').count(), 1, 'Speed Test includes a live graph surface');
     await page.locator('#adapterMenuButton').click();
     await shot('adapter-dropdown');
     await page.keyboard.press('Escape');
@@ -74,7 +100,16 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
     assert(await page.locator('#neighborList').evaluate(e => e.scrollHeight > e.clientHeight && getComputedStyle(e).overflowY === 'auto'));
     await fit('capture desktop with 24 records');
     await shot('capture-desktop');
-    const help = page.locator('#liveTrafficPanel .info-tip').first();
+    await accessible('capture');
+    await page.locator('[data-port-history="0"]').click();
+    assert.equal(await page.locator('.port-side-by-side .port-list-panel').count(), 2, 'Previous and current shown together');
+    assert.equal(await page.locator('.value-changed').count(), 2, 'Both VLAN values highlighted');
+    const panels = await page.locator('.port-list-panel').evaluateAll(nodes => nodes.map(n => ({ x:n.getBoundingClientRect().x, y:n.getBoundingClientRect().y })));
+    assert(panels[0].x < panels[1].x && Math.abs(panels[0].y-panels[1].y)<1, 'Comparison panels are side by side');
+    await shot('comparison-desktop');
+    await accessible('side by side comparison');
+    await page.locator('#closeComparisonBtn').click();
+    const help = page.locator('#speedTestPanel .info-tip').first();
     await help.hover();
     await page.locator('#contextHelp:visible').waitFor();
     await page.keyboard.press('Escape');
@@ -86,7 +121,20 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
     await page.locator('.timeline-group').first().waitFor();
     await fit('history desktop');
     await shot('history-desktop');
+    await accessible('evidence history');
     await page.locator('#settings-tab').click();
+    await page.locator('#openAccountDialogBtn').click();
+    await fit('approve account dialog');
+    await shot('approve-account');
+    await page.locator('#cancelAccountDialogBtn').focus();
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'accountInput', 'Dialog focus wraps');
+    await accessible('account dialog');
+    await page.locator('#cancelAccountDialogBtn').click();
+    await page.locator('#openAdminPasswordDialogBtn').click();
+    await fit('password dialog');
+    await shot('password');
+    await page.locator('#cancelAdminPasswordDialogBtn').click();
     for (const tab of ['accounts', 'general', 'reviews', 'inventory', 'technical']) {
       await page.locator(`#${tab}-tab`).click();
       if (tab === 'inventory') {
@@ -102,6 +150,7 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
       }
       await fit(`${tab} desktop`);
       await shot(`${tab}-desktop`);
+      await accessible(tab);
     }
     for (const [width, height] of [[1280,800], [768,1024], [390,844], [720,500]]) {
       await page.setViewportSize({ width, height });

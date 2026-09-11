@@ -59,7 +59,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
-    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://speed.cloudflare.com; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
     var resourcePath = context.Request.Path.Value ?? "";
     context.Response.Headers.CacheControl =
         resourcePath.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
@@ -270,6 +270,15 @@ app.MapPost("/api/evidence/settings", (EvidenceSettingsUpdate request, HttpReque
 
 app.MapGet("/api/evidence/cache", (EvidenceStore evidence) => Results.Ok(evidence.ListPendingCache()));
 
+app.MapGet("/api/nas/health", (EvidenceStore evidence) => Results.Ok(evidence.GetNasHealth()));
+
+app.MapPost("/api/nas/sync", (EvidenceStore evidence, AuditLog audit) =>
+{
+    var result = evidence.SyncPendingCache();
+    audit.Write("nas.health.sync", result.Failed == 0 ? "success" : "partial", detail: $"pending={result.PendingBefore}; uploaded={result.Uploaded}; deletedExpired={result.DeletedExpired}; failed={result.Failed}; lastError={result.LastError}");
+    return Results.Ok(new { sync = result, health = evidence.GetNasHealth() });
+});
+
 app.MapPost("/api/evidence/sync", (HttpRequest http, EvidenceStore evidence, AdminService admin, AuditLog audit) =>
 {
     var adminStatus = admin.GetStatus();
@@ -477,6 +486,8 @@ static IResult ServeEmbeddedWebFile(string fileName)
         ".css" => "text/css; charset=utf-8",
         ".js" => "application/javascript; charset=utf-8",
         ".png" => "image/png",
+        ".svg" => "image/svg+xml",
+        ".txt" => "text/plain; charset=utf-8",
         ".ico" => "image/x-icon",
         _ => "application/octet-stream"
     };

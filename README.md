@@ -14,8 +14,8 @@ Start with [Getting started](docs/GETTING_STARTED.md), [Troubleshooting](docs/TR
 - Lists physical wired Ethernet adapters, excluding wireless and virtual/VPN adapters.
 - Listens passively for LLDP and CDP advertisements using Npcap and SharpPcap.
 - Parses advertised switch identity, port, capabilities, management address, native VLAN, voice VLAN, and verbose TLVs.
-- Saves local evidence records with workstation name, optional Windows user, capture result, app version, timestamp, and SHA-256 hash.
-- Optionally mirrors evidence JSON files to an internal NAS or shared folder path configured by the user.
+- Saves evidence records with workstation name, optional Windows user, capture result, app version, timestamp, and SHA-256 hash.
+- Uses the configured NAS/shared archive as the default evidence repository. A successful NAS upload keeps an encrypted local cache copy for 7 days; failed uploads remain pending locally until a later sync succeeds.
 - Combines matching LLDP/CDP observations into one switch-port result with Switch IP, advertised chassis MAC, VLANs, and other available values.
 - Shows Port history beside the current capture, reading matching local and configured NAS ledger records. Selecting a record compares previous and current values side by side.
 - Highlights differences between values observed in both captures. Missing values are marked as not observed, rather than treated as confirmed changes. Raw protocol evidence remains available in exports.
@@ -81,14 +81,20 @@ also open the administrator page; cancel restores the current workspace.
 Settings has three administrator tabs: **Account Manager** for approvals, account
 status, and password changes; **Review Center** for identity and NAS evidence
 events; and **General Settings** for evidence storage, identity, retention,
-capture policy, licensing, and cache synchronization. Disabling an
+capture policy, licensing, NAS health, and cache synchronization. Disabling an
 account prevents new sign-ins and invalidates its active user sessions. This
 local application gate does not replace Windows file permissions or enterprise
 identity management.
 
 ## Build and verification
 
-The UI has Capture and Evidence history workspaces for regular users, plus administrator-only Settings tabs for access, review, inventory, and technical assessment. Capture controls and observed neighbors share one screen; protocol details are expandable. Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) are bundled local pages. The application does not fetch remote fonts or interface assets.
+The UI has Capture and Evidence history workspaces for regular users, plus administrator-only Settings tabs for access, review, inventory, and technical assessment. The rebuilt interface uses an Arial-like system type stack, local Heroicons, a single compact switch-port result, and a one-line port history list. Previous and current captures open side by side with changed fields highlighted. Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) use the same design.
+
+The Capture screen includes a floating NAS health control with a stethoscope icon. It checks whether the configured repository is writable, shows retained encrypted cache records, pending uploads, cache records close to cleanup, and provides a force-upload action for pending logs.
+
+A Speed Test starts after sign-in and can be canceled or run again. It measures download/upload, HTTPS ping, and jitter through Cloudflare using up to 40 MB per run plus overhead, with a 45-second deadline. This is active Internet traffic over the browser's selected route, which may differ from the Ethernet NIC chosen for passive discovery. No switch evidence or account information is submitted. See [network behavior](docs/NETWORK_BEHAVIOR.md).
+
+Typography uses locally available system fonts, preferring Arial, Helvetica Neue, and Segoe UI. Icons and interface graphics load locally; no remote fonts or interface assets are fetched. Asset sources and licensing are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 The legal pages describe this build's behavior. Maintainers should review them for their distribution and any applicable agreements before a public commercial release.
 

@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Local Windows utility for passive wired Ethernet discovery and evidence reports."
+      content="JackPeek identifies wired switch connections, compares port history, and runs a Speed Test from your Windows workstation."
     />
     <title>Capture | JackPeek</title>
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/svg+xml" href="/assets/jackpeek-mark.svg" />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/speed-test.js" defer></script>
+    <script src="/ui-system.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/technical-review.js" defer></script>
   </head>
@@ -21,33 +23,39 @@
     >
       <div class="auth-card entry-card">
         <div class="auth-brand">
-          <img src="/assets/port-checker.png" width="56" height="56" alt="" />
-          <div><strong>JackPeek</strong><span>Designed by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span></div>
+          <img src="/assets/jackpeek-mark.svg" width="56" height="56" alt="" />
+          <div>
+            <strong>JackPeek</strong
+            ><span
+              >Designed by <b class="sys-summit-wordmark">SysSummit</b></span
+            >
+          </div>
         </div>
-        <p class="workspace-label">Ethernet discovery &amp; evidence</p>
+        <p class="workspace-label">Your network workspace</p>
         <h1 id="signInTitle" tabindex="-1">Secure access</h1>
         <p>
-          Use your approved Windows account, or sign in as an administrator to
-          manage access.
+          Sign in with your approved Windows account to discover ports and
+          review your team's evidence.
         </p>
         <div class="signin-options">
           <button
             id="windowsSignInBtn"
-            class="signin-option"
+            class="signin-option primary"
             type="button"
             disabled
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="9" cy="8" r="3" />
-              <path
-                d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 3a5 5 0 0 1 3 4v2"
-              /></svg
-            ><span
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#user-circle" />
+            </svg>
+            <span
               ><strong>Log in</strong
               ><small id="detectedAccount"
                 >Checking Windows account…</small
               ></span
-            ><span aria-hidden="true">›</span>
+            >
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-right" />
+            </svg>
           </button>
           <button
             id="administratorSignInBtn"
@@ -55,29 +63,40 @@
             type="button"
             disabled
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="10" width="14" height="11" rx="2" />
-              <path d="M8 10V6a4 4 0 0 1 8 0v4" /></svg
-            ><span
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#lock-closed" />
+            </svg>
+            <span
               ><strong>Log in as Administrator</strong
-              ><small>Account Manager and system settings</small></span
-            ><span aria-hidden="true">›</span>
+              ><small>Manage accounts and application settings</small></span
+            >
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-right" />
+            </svg>
           </button>
         </div>
-        <p id="signInStatus" role="status" class="inline-status">
-          Connecting to the local service…
+        <p id="signInStatus" class="inline-status" role="status">
+          Connecting to JackPeek…
         </p>
-        <button id="retrySessionBtn" class="button" type="button" hidden>
+        <button
+          id="retrySessionBtn"
+          class="button secondary"
+          type="button"
+          hidden
+        >
           Try again
         </button>
         <p class="auth-footnote">
-          Access is restricted to approved Windows accounts.
+          A speed test starts after sign-in. It uses up to 40 MB and can be
+          canceled at any time.
         </p>
         <nav class="auth-legal" aria-label="Sign-in legal links">
-          <a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+          <a href="/privacy">Privacy Policy</a
+          ><a href="/terms">Terms &amp; Conditions</a>
         </nav>
       </div>
     </section>
+
     <section
       id="profileScreen"
       class="auth-screen"
@@ -86,89 +105,106 @@
     >
       <div class="auth-card">
         <div class="auth-brand">
-          <img src="/assets/port-checker.png" width="56" height="56" alt="" />
-          <div><strong>JackPeek</strong><span>Designed by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span></div>
+          <img src="/assets/jackpeek-mark.svg" width="56" height="56" alt="" />
+          <div>
+            <strong>JackPeek</strong
+            ><span
+              >Designed by <b class="sys-summit-wordmark">SysSummit</b></span
+            >
+          </div>
         </div>
-        <span class="badge success">Account approved</span>
-        <h1 id="profileTitle" tabindex="-1">Introduce yourself</h1>
+        <span class="badge success"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/heroicons.svg#check-circle" /></svg
+          >Account approved</span
+        >
+        <h1 id="profileTitle" tabindex="-1">Make your scans yours.</h1>
         <p>
-          Your name will identify your future scans when identity recording is
-          enabled. You only need to do this once on this installation.
+          Add your name for future records when identity recording is enabled.
+          You only need to do this once on this installation.
         </p>
         <p id="profileAccount" class="account-label"></p>
         <form id="profileForm" class="stack-form">
-          <label
-            >First name<input
-              id="firstNameInput"
-              autocomplete="given-name"
-              maxlength="80"
-              required
-          /></label>
-          <label
-            >Last name<input
-              id="lastNameInput"
-              autocomplete="family-name"
-              maxlength="80"
-              required
-          /></label>
-          <p id="profileStatus" role="status"></p>
+          <div class="field-grid">
+            <label for="firstNameInput"
+              >First name<input
+                id="firstNameInput"
+                autocomplete="given-name"
+                maxlength="80"
+                required
+            /></label>
+            <label for="lastNameInput"
+              >Last name<input
+                id="lastNameInput"
+                autocomplete="family-name"
+                maxlength="80"
+                required
+            /></label>
+          </div>
+          <p id="profileStatus" class="inline-status" role="status"></p>
           <button id="profileSubmitBtn" class="button primary" type="submit">
-            Save name &amp; continue
+            Save &amp; continue<svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-right" />
+            </svg>
           </button>
-          <button class="button" type="button" data-back-signin>
+          <button class="button secondary" type="button" data-back-signin>
             Back to sign-in
           </button>
         </form>
       </div>
     </section>
+
     <section
       id="accessDeniedScreen"
       class="auth-screen access-denied-screen"
+      aria-labelledby="accessDeniedTitle"
       hidden
     >
       <div class="auth-card access-card">
         <div class="auth-brand">
-          <b class="sys-summit-wordmark sys-summit-wordmark-large"><i>SYS</i>SUMMIT</b>
-          <span>JackPeek product access</span>
+          <img src="/assets/jackpeek-mark.svg" width="56" height="56" alt="" />
+          <div>
+            <strong>JackPeek</strong
+            ><span
+              >Designed by <b class="sys-summit-wordmark">SysSummit</b></span
+            >
+          </div>
         </div>
-        <p class="workspace-label">Ethernet discovery</p>
         <div class="denied-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48">
-            <circle cx="24" cy="24" r="20" />
-            <path d="M17 20h.01M31 20h.01M16 32c3.8-4 12.2-4 16 0" />
+          <svg class="icon">
+            <use href="/assets/heroicons.svg#face-frown" />
           </svg>
         </div>
-        <p class="access-kicker">Access denied</p>
-        <h1>This Windows account is not approved</h1>
+        <span class="badge error">Access not approved</span>
+        <h1 id="accessDeniedTitle" tabindex="-1">Let's get you access.</h1>
         <p id="accessDeniedReason">
-          The approved-account repository did not recognize this Windows
-          session.
+          This Windows account is not in the approved account directory.
         </p>
         <div class="need-access">
-          <strong>Need access?</strong>
+          <strong>Request approval</strong>
           <p>
-            Email
+            Send your Windows domain username to
             <a href="mailto:joshua.alvarez@rwjbh.org"
               >joshua.alvarez@rwjbh.org</a
             >
             or
             <a href="mailto:darien.valerin@rwjbh.org"
               >darien.valerin@rwjbh.org</a
-            >
-            to request access.
+            >.
           </p>
         </div>
-        <button class="button" type="button" data-back-signin>
+        <button class="button secondary" type="button" data-back-signin>
           Back to sign-in
         </button>
         <button class="button primary" type="button" data-open-admin>
           Log in as Administrator
         </button>
         <p id="accessDeniedAccount" class="auth-footnote">
-          Checking Windows account.
+          Checking Windows account…
         </p>
       </div>
     </section>
+
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="topbar">
       <div class="shell topbar-inner">
@@ -177,18 +213,18 @@
           class="brand"
           href="/#capture"
           aria-label="JackPeek capture"
-        >
-          <img
-            src="/assets/port-checker.png"
+          ><img
+            src="/assets/jackpeek-mark.svg"
             width="36"
             height="36"
             alt=""
           /><span>JackPeek</span></a
-        ><span class="product-label">Network discovery</span>
+        >
+        <span class="product-label">Network workspace</span>
         <div class="workstation">
           <span id="sessionMachine">Local workstation</span
-          ><span class="version">v1.0</span
-          ><button
+          ><span class="version">v1.0</span>
+          <button
             id="signOutBtn"
             class="button small topbar-signout"
             type="button"
@@ -210,7 +246,9 @@
             aria-controls="capture"
             data-tab="capture"
           >
-            Capture
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#signal" /></svg
+            >Capture
           </button>
           <button
             id="history-tab"
@@ -222,7 +260,9 @@
             tabindex="-1"
             data-tab="history"
           >
-            Evidence history
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#clock" /></svg
+            >Evidence history
           </button>
           <button
             id="settings-tab"
@@ -236,53 +276,55 @@
             aria-hidden="true"
             hidden
           >
-            Settings
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#cog-6-tooth" /></svg
+            >Settings
           </button>
         </div>
-        <span class="nav-note">Passive only</span>
+        <span class="nav-note"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/heroicons.svg#shield-check" /></svg
+          >Local workspace</span
+        >
       </div>
     </div>
+
     <main id="main" class="shell main" tabindex="-1">
       <section id="capture" role="tabpanel" aria-labelledby="capture-tab">
         <div class="page-heading">
           <div>
+            <p class="workspace-label">Wired Ethernet</p>
             <h1>Port discovery</h1>
-            <p>Identify the switch and port connected to this workstation.</p>
+            <p>
+              Discover the switch port. Compare its history. Check your Internet
+              speed.
+            </p>
           </div>
           <button id="refreshBtn" class="button secondary" type="button">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"
-              /></svg
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-path" /></svg
             ><span>Refresh adapters</span>
           </button>
         </div>
-        <div class="trust-strip" aria-label="Passive capture assurances">
-          <span>Passive only</span>
-          <span>No switch login</span>
-          <span>No SNMP</span>
-          <span>No configuration changes</span>
-        </div>
+
         <section
           class="panel adapter-panel"
-          aria-label="Adapter and capture controls"
+          aria-label="Ethernet adapter and capture"
         >
           <dl class="adapter-summary">
             <div class="adapter-identity">
-              <span class="adapter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 4h14v10l-3 3H8l-3-3V4Z" />
-                  <path d="M8 8h2m2 0h2m2 0h1M9 17v3m6-3v3" />
-                </svg>
-              </span>
-              <dt>Wired adapter</dt>
-              <dd id="adapterName">Checking adapters</dd>
+              <span class="adapter-icon" aria-hidden="true"
+                ><svg class="icon">
+                  <use href="/assets/heroicons.svg#server" /></svg
+              ></span>
+              <dt>Ethernet adapter</dt>
+              <dd id="adapterName">Checking adapters…</dd>
               <dd id="adapterDescription" class="subvalue">
-                Reading Windows Ethernet interfaces.
+                Reading wired Windows interfaces.
               </dd>
             </div>
             <div>
-              <dt>Link state</dt>
+              <dt>Link</dt>
               <dd><span id="adapterLink" class="badge">Checking</span></dd>
             </div>
             <div>
@@ -290,20 +332,23 @@
               <dd id="adapterMac" class="mono">Not available</dd>
             </div>
             <div>
-              <dt>IP addresses</dt>
+              <dt>Workstation IP</dt>
               <dd id="adapterIps" class="mono">Not assigned</dd>
             </div>
           </dl>
           <form id="captureForm" class="capture-controls">
             <div class="adapter-control">
-              <span class="field-label">Ethernet adapter</span>
+              <label class="field-label" for="adapterMenuButton"
+                >Ethernet adapter</label
+              >
               <select
                 id="adapterSelect"
                 class="native-adapter-select"
+                aria-label="Ethernet adapter"
                 tabindex="-1"
                 disabled
               >
-                <option value="">Loading adapters...</option>
+                <option value="">Loading adapters…</option>
               </select>
               <button
                 id="adapterMenuButton"
@@ -314,15 +359,21 @@
                 aria-controls="adapterMenu"
                 disabled
               >
-                <span id="adapterMenuLabel">Loading adapters...</span>
+                <span id="adapterMenuLabel">Loading adapters…</span>
               </button>
-              <div id="adapterMenu" class="adapter-menu" role="listbox" hidden></div>
+              <div
+                id="adapterMenu"
+                class="adapter-menu"
+                role="listbox"
+                aria-label="Available Ethernet adapters"
+                hidden
+              ></div>
             </div>
-            <label class="capture-duration" for="durationInput">
-              <span class="field-label">Listen time</span>
-              <span class="duration-input-row">
-                <span class="duration-input-shell">
-                  <input
+            <label class="capture-duration" for="durationInput"
+              ><span class="field-label">Listen time</span
+              ><span class="duration-input-row"
+                ><span class="duration-input-shell"
+                  ><input
                     id="durationInput"
                     type="number"
                     min="5"
@@ -332,33 +383,38 @@
                     inputmode="numeric"
                     aria-describedby="durationUnit"
                     required
-                  />
-                  <small id="durationUnit">secs</small>
-                </span>
-              </span>
-            </label>
-            <button id="scanBtn" class="button primary capture-action" type="submit" disabled>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m9 5 10 7-10 7z" /></svg
-              ><span>Start capture</span></button
-            ><button
+                  /><small id="durationUnit">seconds</small></span
+                ></span
+              ></label
+            >
+            <button
+              id="scanBtn"
+              class="button primary capture-action"
+              type="submit"
+              disabled
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/heroicons.svg#play" /></svg
+              ><span>Start capture</span>
+            </button>
+            <button
               id="resumeScanBtn"
               class="button secondary"
               type="button"
               hidden
             >
-              Check capture status
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/heroicons.svg#arrow-path" /></svg
+              >Check capture status
             </button>
           </form>
           <div class="capture-status">
-            <p id="status" role="status">Loading Ethernet adapters...</p>
-            <span id="captureState" class="badge"
-              >Checking capture support</span
-            >
+            <p id="status" role="status">Loading Ethernet adapters…</p>
+            <span id="captureState" class="badge">Checking Npcap</span>
           </div>
           <div id="captureProgress" class="capture-progress" hidden>
             <div class="progress-label">
-              <span id="progressText">Listening for advertisements</span
+              <span id="progressText">Listening for switch advertisements</span
               ><span id="countdown" class="mono">30s</span>
             </div>
             <progress
@@ -369,90 +425,282 @@
             ></progress>
           </div>
         </section>
-        <div id="captureNotice" class="notice" hidden></div>
-        <div class="section-heading">
-          <h2>Switch port <span id="neighborCount" class="count">0</span></h2>
-          <span id="captureSummary" class="secondary-text"
-            >No capture in this session</span
+        <div id="captureNotice" class="notice" role="status" hidden></div>
+        <div id="nasHealthDock" class="nas-health-dock" data-state="unknown">
+          <button
+            id="nasHealthBtn"
+            class="nas-health-button"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-controls="nasHealthMenu"
+            title="NAS repository health"
           >
-        </div>
-        <div id="resultContext" class="result-context" hidden></div>
-        <section class="panel result-workspace" aria-label="Discovery results">
-          <aside class="neighbor-sidebar">
-            <div class="sidebar-heading">Port history</div>
-            <div id="neighborList">
-              <p class="sidebar-empty">
-                Capture a switch port to find its previous records.
-              </p>
-            </div>
-          </aside>
-          <div id="results" class="neighbor-detail">
-            <div class="empty-state">
-              <div class="empty-symbol" aria-hidden="true">
-                <svg viewBox="0 0 48 48">
-                  <rect x="7" y="12" width="34" height="24" rx="3" />
-                  <path d="M13 22h4v6h-4zm9 0h4v6h-4zm9 0h4v6h-4M14 17h20" />
-                </svg>
+            <svg
+              class="icon"
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M6 4v5a4 4 0 0 0 8 0V4" />
+              <path d="M4 4h2" />
+              <path d="M14 4h2" />
+              <path d="M10 13v2a5 5 0 0 0 10 0v-1" />
+              <circle cx="20" cy="11" r="2" />
+            </svg>
+            <span id="nasHealthBadge" class="nas-health-badge" hidden>0</span>
+          </button>
+          <div
+            id="nasHealthMenu"
+            class="nas-health-menu"
+            role="dialog"
+            aria-labelledby="nasHealthTitle"
+            hidden
+          >
+            <div class="nas-health-heading">
+              <div>
+                <p class="workspace-label">NAS repository</p>
+                <h3 id="nasHealthTitle">Health</h3>
               </div>
-              <h3>Ready when you are</h3>
-              <p>
-                Connect wired Ethernet, select the adapter, and start a capture.
-                JackPeek listens for switch advertisements.
-              </p>
+              <span id="nasHealthState" class="badge">Checking</span>
+            </div>
+            <p id="nasHealthMessage" class="nas-health-message">
+              Checking NAS repository health.
+            </p>
+            <dl class="nas-health-grid">
+              <div>
+                <dt>Retained local logs</dt>
+                <dd id="nasRetainedCount">0</dd>
+              </div>
+              <div>
+                <dt>Pending upload</dt>
+                <dd id="nasPendingCount">0</dd>
+              </div>
+              <div>
+                <dt>Close to expire</dt>
+                <dd id="nasExpiringCount">0</dd>
+              </div>
+              <div>
+                <dt>Next expiry</dt>
+                <dd id="nasNextExpiry">None</dd>
+              </div>
+            </dl>
+            <p id="nasArchivePath" class="nas-health-path mono">
+              Archive path not loaded.
+            </p>
+            <div class="nas-health-actions">
+              <button id="nasForceUploadBtn" class="button primary small" type="button">
+                Force upload
+              </button>
+              <button id="nasRefreshHealthBtn" class="button secondary small" type="button">
+                Refresh
+              </button>
+            </div>
+            <p id="nasHealthSyncStatus" class="inline-status" role="status"></p>
+          </div>
+        </div>
+
+        <section
+          class="panel result-panel"
+          aria-label="Switch port result and history"
+        >
+          <div class="section-heading panel-heading">
+            <h2>Switch port <span id="neighborCount" class="count">0</span></h2>
+            <span id="captureSummary" class="secondary-text"
+              >No capture yet</span
+            >
+          </div>
+          <div id="resultContext" class="result-context" hidden></div>
+          <div class="result-workspace">
+            <aside
+              class="neighbor-sidebar"
+              aria-label="Previous captures of this port"
+            >
+              <div class="sidebar-heading">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#clock" /></svg
+                >Port history
+              </div>
+              <div id="neighborList">
+                <p class="sidebar-empty">
+                  Capture a port to see earlier visits.
+                </p>
+              </div>
+            </aside>
+            <div id="results" class="neighbor-detail">
+              <div class="empty-state">
+                <div class="empty-symbol" aria-hidden="true">
+                  <svg class="icon">
+                    <use href="/assets/heroicons.svg#server" />
+                  </svg>
+                </div>
+                <h3>Ready to discover</h3>
+                <p>
+                  Connect Ethernet and start a capture. Your switch details and
+                  port history will appear here.
+                </p>
+              </div>
             </div>
           </div>
         </section>
+
         <section
-          id="liveTrafficPanel"
-          class="panel live-traffic-panel"
-          aria-label="Observed workstation traffic"
+          id="speedTestPanel"
+          class="panel speed-test-panel"
+          aria-labelledby="speedTestTitle"
         >
-          <div class="live-traffic-heading">
-            <div>
-              <span class="workspace-label">Local adapter counters</span>
-              <h2>Observed traffic</h2>
+          <div class="speed-test-heading panel-heading">
+            <div class="heading-icon">
+              <span class="icon-tile" aria-hidden="true"
+                ><svg class="icon">
+                  <use href="/assets/heroicons.svg#bolt" /></svg
+              ></span>
+              <div>
+                <h2 id="speedTestTitle">Speed Test</h2>
+                <p>Download, upload, and latency to Cloudflare.</p>
+              </div>
             </div>
-            <span id="liveTrafficState" class="badge">Waiting for adapter</span>
+            <div class="speed-actions">
+              <span id="speedTestState" class="badge">Ready</span
+              ><button
+                id="speedTestStartBtn"
+                class="button secondary"
+                type="button"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#play" /></svg
+                >Run speed test</button
+              ><button
+                id="speedTestCancelBtn"
+                class="button secondary"
+                type="button"
+                hidden
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-          <dl class="live-traffic-grid">
-            <div>
-              <dt>RX Mbps <button class="info-tip" type="button" title="Data received by the selected Windows adapter. JackPeek reads the local byte counter and sends no test traffic." aria-label="What is RX Mbps?">?</button></dt>
-              <dd id="liveTrafficRx" class="metric-value">0.00</dd>
+          <div class="speed-test-stage" aria-label="Live speed test meter">
+            <div class="speed-gauge" aria-hidden="true">
+              <div class="speed-gauge-ring">
+                <span id="speedGaugeValue">–</span>
+                <small id="speedGaugeLabel">Mbps</small>
+              </div>
             </div>
-            <div>
-              <dt>TX Mbps <button class="info-tip" type="button" title="Data sent by the selected Windows adapter. This includes existing workstation traffic only." aria-label="What is TX Mbps?">?</button></dt>
-              <dd id="liveTrafficTx" class="metric-value">0.00</dd>
+            <div class="speed-chart-wrap">
+              <svg
+                id="speedChart"
+                class="speed-chart"
+                viewBox="0 0 360 120"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="Live speed test graph"
+              >
+                <path class="speed-chart-grid" d="M0 30 H360 M0 60 H360 M0 90 H360" />
+                <path id="speedChartPath" class="speed-chart-line" d="" />
+              </svg>
+              <div class="speed-chart-scale">
+                <span>0</span><span id="speedChartPeak">Waiting</span>
+              </div>
             </div>
-            <div>
-              <dt>Total Mbps <button class="info-tip" type="button" title="Combined receive and transmit rate from the local Windows adapter counters." aria-label="What is total Mbps?">?</button></dt>
-              <dd id="liveTrafficTotal" class="metric-value">0.00</dd>
+          </div>
+          <dl class="speed-test-grid">
+            <div class="speed-metric speed-metric-primary">
+              <dt>
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#arrow-down-tray" /></svg
+                >Download
+              </dt>
+              <dd>
+                <span id="speedDownload" class="metric-value">–</span
+                ><span class="speed-unit">Mbps</span>
+              </dd>
             </div>
-            <div>
-              <dt>Peak Mbps <button class="info-tip" type="button" title="Highest combined rate observed during the current 60-second local window." aria-label="What is peak Mbps?">?</button></dt>
-              <dd id="liveTrafficPeak" class="metric-value">0.00</dd>
+            <div class="speed-metric speed-metric-primary">
+              <dt>
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#arrow-up-tray" /></svg
+                >Upload
+              </dt>
+              <dd>
+                <span id="speedUpload" class="metric-value">–</span
+                ><span class="speed-unit">Mbps</span>
+              </dd>
             </div>
-            <div>
-              <dt>60s average <button class="info-tip" type="button" title="Average combined rate from the recent local counter samples." aria-label="What is the 60-second average?">?</button></dt>
-              <dd id="liveTrafficAverage" class="metric-value">0.00</dd>
+            <div class="speed-metric">
+              <dt>
+                Ping<button
+                  class="info-tip"
+                  type="button"
+                  aria-label="About ping"
+                  title="Median HTTPS response latency to the Cloudflare edge, not an ICMP ping. Includes browser and server processing."
+                >
+                  ?
+                </button>
+              </dt>
+              <dd>
+                <span id="speedPing" class="metric-value">–</span
+                ><span class="speed-unit">ms</span>
+              </dd>
+            </div>
+            <div class="speed-metric">
+              <dt>
+                Jitter<button
+                  class="info-tip"
+                  type="button"
+                  aria-label="About jitter"
+                  title="Average difference between consecutive HTTPS latency measurements. Lower values mean more consistent response times."
+                >
+                  ?
+                </button>
+              </dt>
+              <dd>
+                <span id="speedJitter" class="metric-value">–</span
+                ><span class="speed-unit">ms</span>
+              </dd>
+            </div>
+            <div class="speed-metric speed-edge">
+              <dt>Cloudflare edge</dt>
+              <dd id="speedEdge">Not connected</dd>
             </div>
           </dl>
-          <div class="live-traffic-bars" aria-hidden="true">
-            <div><span>Down</span><progress id="liveTrafficRxBar" value="0" max="100"></progress></div>
-            <div><span>Up</span><progress id="liveTrafficTxBar" value="0" max="100"></progress></div>
+          <div class="speed-test-footer">
+            <progress
+              id="speedTestProgress"
+              max="100"
+              value="0"
+              aria-label="Speed test progress"
+            ></progress>
+            <p
+              id="speedTestDetail"
+              class="inline-status"
+              role="status"
+              aria-live="polite"
+            >
+              A speed test starts after sign-in. You can also run one here.
+            </p>
+            <p class="speed-test-footnote">
+              Active HTTPS test via Cloudflare. Uses your browser's network
+              route, which may differ from the selected Ethernet adapter. Up to
+              40 MB per run; cancel anytime.
+            </p>
           </div>
-          <p id="liveTrafficDetail" class="comparison-note">
-            Select a connected wired adapter to observe local counters.
-          </p>
-          <p class="live-traffic-footnote">
-            Passive display only. JackPeek does not generate traffic for these readings.
-          </p>
         </section>
         <div id="lastEvidence" class="evidence-strip" hidden></div>
         <p class="context-note">
-          <strong>About these results</strong> Only advertised information is
-          shown. Missing fields mean the switch did not advertise a value.
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/heroicons.svg#information-circle" /></svg
+          ><span
+            >Port discovery is passive. Results contain only information
+            advertised by the switch; unadvertised fields stay empty.</span
+          >
         </p>
       </section>
+
       <section
         id="history"
         role="tabpanel"
@@ -461,26 +709,29 @@
       >
         <div class="page-heading">
           <div>
+            <p class="workspace-label">Saved evidence</p>
             <h1>Evidence history</h1>
             <p>
-              Review every saved capture from this system and export its evidence.
+              Find a capture, compare changes, and export the details you need.
             </p>
           </div>
           <button id="refreshReportsBtn" class="button secondary" type="button">
-            Refresh history
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-path" /></svg
+            >Refresh history
           </button>
         </div>
         <div class="panel history-panel">
           <div class="history-toolbar">
             <label class="search-label" for="reportSearch"
-              >Find a report<input
+              >Search evidence<input
                 id="reportSearch"
                 type="search"
-                placeholder="Device, port, workstation, or evidence ID"
-                autocomplete="off" /></label
-            ><div class="filter-toolbar-actions">
-              <span id="reportCount" class="secondary-text"
-                >Loading reports</span
+                placeholder="Switch, port, workstation, or evidence ID"
+                autocomplete="off"
+            /></label>
+            <div class="filter-toolbar-actions">
+              <span id="reportCount" class="badge">Loading reports…</span
               ><button
                 id="historyFiltersToggle"
                 class="button secondary filter-toggle"
@@ -488,42 +739,85 @@
                 aria-expanded="true"
                 aria-controls="historyFilters"
               >
-                <span>Filters</span><span class="filter-toggle-chevron" aria-hidden="true"></span>
+                <span>Filters</span
+                ><span class="filter-toggle-chevron" aria-hidden="true"></span>
               </button>
             </div>
           </div>
-          <div id="historyFilters" class="history-filters" aria-label="Evidence filters">
-            <label class="filter-field">Show<select id="reportFilter">
-              <option value="all">All evidence</option>
-              <option value="success">Successful captures</option>
-              <option value="empty">No advertisements</option>
-              <option value="error">With errors</option>
-              <option value="pending">Pending NAS sync</option>
-              <option value="review">Admin review required</option>
-            </select></label>
+          <div
+            id="historyFilters"
+            class="history-filters"
+            aria-label="Evidence filters"
+          >
+            <label class="filter-field" for="reportFilter"
+              >Capture outcome<select id="reportFilter">
+                <option value="all">All evidence</option>
+                <option value="success">Successful captures</option>
+                <option value="empty">No advertisements</option>
+                <option value="error">With errors</option>
+                <option value="pending">Pending NAS sync</option>
+                <option value="review">Admin review required</option>
+              </select></label
+            >
             <div class="filter-field history-combobox-field">
               <label for="timelineSwitchFilter">Switch</label>
               <div class="history-combobox" data-history-combobox="switch">
-                <input id="timelineSwitchFilter" type="search" placeholder="Name, IP, or MAC" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="switchFilterMenu" />
-                <div id="switchFilterMenu" class="history-combobox-menu" role="listbox" hidden></div>
+                <input
+                  id="timelineSwitchFilter"
+                  type="search"
+                  placeholder="Name, IP, or MAC"
+                  autocomplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  aria-controls="switchFilterMenu"
+                />
+                <div
+                  id="switchFilterMenu"
+                  class="history-combobox-menu"
+                  role="listbox"
+                  aria-label="Matching switches"
+                  hidden
+                ></div>
               </div>
             </div>
             <div class="filter-field history-combobox-field">
               <label for="timelinePortFilter">Port</label>
               <div class="history-combobox" data-history-combobox="port">
-                <input id="timelinePortFilter" type="search" placeholder="Port or VLAN" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="portFilterMenu" />
-                <div id="portFilterMenu" class="history-combobox-menu" role="listbox" hidden></div>
+                <input
+                  id="timelinePortFilter"
+                  type="search"
+                  placeholder="Port or VLAN"
+                  autocomplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  aria-controls="portFilterMenu"
+                />
+                <div
+                  id="portFilterMenu"
+                  class="history-combobox-menu"
+                  role="listbox"
+                  aria-label="Matching ports"
+                  hidden
+                ></div>
               </div>
             </div>
-            <label class="filter-field">Status<select id="timelineStatusFilter">
-              <option value="all">All identity states</option>
-              <option value="confirmed">Identity confirmed</option>
-              <option value="updated">Identity updated</option>
-              <option value="review">Requires review</option>
-              <option value="new">New identity</option>
-            </select></label>
-            <label class="filter-field">From<input id="timelineFromFilter" type="date" /></label>
-            <label class="filter-field">To<input id="timelineToFilter" type="date" /></label>
+            <label class="filter-field" for="timelineStatusFilter"
+              >Identity status<select id="timelineStatusFilter">
+                <option value="all">All identity states</option>
+                <option value="confirmed">Identity confirmed</option>
+                <option value="updated">Identity updated</option>
+                <option value="review">Requires review</option>
+                <option value="new">New identity</option>
+              </select></label
+            >
+            <label class="filter-field" for="timelineFromFilter"
+              >From<input id="timelineFromFilter" type="date"
+            /></label>
+            <label class="filter-field" for="timelineToFilter"
+              >To<input id="timelineToFilter" type="date"
+            /></label>
           </div>
           <p id="historyStatus" class="inline-status" role="status"></p>
           <div id="reports" class="timeline-list" aria-live="polite"></div>
@@ -535,6 +829,7 @@
           hidden
         ></section>
       </section>
+
       <section
         id="settings"
         role="tabpanel"
@@ -543,19 +838,19 @@
       >
         <div class="page-heading">
           <div>
-            <h1>Settings</h1>
-            <p>Manage access and configure your JackPeek installation.</p>
+            <p class="workspace-label">Administration</p>
+            <h1>Workspace settings.</h1>
+            <p>Access, evidence, and the way your installation works.</p>
           </div>
-          <span id="settingsPolicy" class="badge">Loading policy</span>
+          <span id="settingsPolicy" class="badge">Loading policy…</span>
         </div>
-
         <section id="settingsLocked" class="panel settings-locked">
-          <span class="badge">Administrator access</span>
-          <h2>Manage this workstation</h2>
-          <p>
-            Sign in as an administrator to manage approved accounts and
-            application settings.
-          </p>
+          <span class="icon-tile" aria-hidden="true"
+            ><svg class="icon">
+              <use href="/assets/heroicons.svg#lock-closed" /></svg
+          ></span>
+          <h2>Administrator access required</h2>
+          <p>Sign in to manage approved accounts and application settings.</p>
           <button class="button primary" type="button" data-open-admin>
             Log in as Administrator
           </button>
@@ -569,15 +864,16 @@
           <div class="workspace-header">
             <div class="section-heading">
               <div>
-                <p class="workspace-label">Administration</p>
-                <h2 id="adminWorkspaceTitle">Workspace settings</h2>
-                <p>People, permissions, and the way your workstation works.</p>
+                <h2 id="adminWorkspaceTitle">Manage this installation</h2>
+                <p>Changes apply to this Windows workstation.</p>
               </div>
               <div class="admin-session">
                 <span id="adminAccessStatus" class="badge success"
                   >Administrator active</span
                 ><button id="lockAdminBtn" class="button small" type="button">
-                  Lock &amp; sign out
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#lock-closed" /></svg
+                  >Lock &amp; sign out
                 </button>
               </div>
             </div>
@@ -595,11 +891,8 @@
                 aria-controls="accounts-panel"
                 data-admin-tab="accounts"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="9" cy="8" r="3" />
-                  <path
-                    d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 3a5 5 0 0 1 3 4v2"
-                  /></svg
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#users" /></svg
                 >Account Manager
               </button>
               <button
@@ -612,10 +905,8 @@
                 tabindex="-1"
                 data-admin-tab="general"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 7h16M4 17h16" />
-                  <circle cx="9" cy="7" r="3" />
-                  <circle cx="16" cy="17" r="3" /></svg
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#cog-6-tooth" /></svg
                 >General Settings
               </button>
               <button
@@ -628,77 +919,43 @@
                 tabindex="-1"
                 data-admin-tab="reviews"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/><path d="m16 16 3 3"/></svg>
-                Review Center <span id="adminReviewTabCount" class="count">0</span>
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#shield-check" /></svg
+                >Review Center<span id="adminReviewTabCount" class="count"
+                  >0</span
+                >
               </button>
-              <button id="inventory-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="inventory-panel" tabindex="-1" data-admin-tab="inventory">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="5" rx="1"/><rect x="4" y="14" width="16" height="5" rx="1"/><path d="M8 7.5h.01M8 16.5h.01"/></svg>
-                Switch inventory
+              <button
+                id="inventory-tab"
+                class="workspace-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="inventory-panel"
+                tabindex="-1"
+                data-admin-tab="inventory"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#server" /></svg
+                >Switch inventory
               </button>
-              <button id="technical-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="technical-panel" tabindex="-1" data-admin-tab="technical">
-                Technical Review
+              <button
+                id="technical-tab"
+                class="workspace-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="technical-panel"
+                tabindex="-1"
+                data-admin-tab="technical"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#document-text" /></svg
+                >Technical Review
               </button>
             </div>
           </div>
-          <section id="technical-panel" class="admin-panel technical-review" role="tabpanel" aria-labelledby="technical-tab" data-admin-panel="technical" hidden>
-            <div class="technical-heading">
-              <div><span class="workspace-label">Application assessment</span><h3>Technical Review</h3><p id="technicalBuild">Loading reviewed build...</p></div>
-              <button id="exportTechnicalReview" class="button secondary" type="button">Export Technical Review</button>
-            </div>
-            <div id="technicalCapabilities" class="technical-capabilities" aria-label="Verified capabilities"></div>
-            <p class="technical-assessment">Conditional evaluation. Open security and deployment risks remain.</p>
-            <div class="technical-toolbar">
-              <label for="technicalSearch">Find a topic<input id="technicalSearch" type="search" placeholder="Network, cookies, NAS, permissions..." autocomplete="off" /></label>
-              <button id="refreshTechnicalReview" class="button secondary" type="button">Refresh review</button>
-            </div>
-            <p id="technicalStatus" role="status" aria-live="polite"></p>
-            <div id="technicalSections"></div>
-          </section>
-          <section id="inventory-panel" class="admin-panel" role="tabpanel" aria-labelledby="inventory-tab" data-admin-panel="inventory" hidden>
-            <div class="review-center-header">
-              <div><span class="workspace-label">Infrastructure inventory</span><h3>Switch inventory</h3><p>Local inventory built only from passive evidence and PortLedger records.</p></div>
-              <div class="review-header-actions"><span id="inventoryCount" class="badge">0 switches</span><button id="refreshInventoryBtn" class="button secondary" type="button">Refresh inventory</button></div>
-            </div>
-            <div class="directory-toolbar inventory-toolbar">
-              <label class="search-label">Find a switch<input id="inventorySearch" type="search" placeholder="Name, IP, MAC, model, or port" autocomplete="off" /></label>
-              <button
-                id="inventoryFiltersToggle"
-                class="button secondary filter-toggle"
-                type="button"
-                aria-expanded="true"
-                aria-controls="inventoryFilters"
-              >
-                <span>Filters</span><span class="filter-toggle-chevron" aria-hidden="true"></span>
-              </button>
-              <div id="inventoryFilters" class="inventory-filter-options" aria-label="Inventory filters">
-                <label>Status<select id="inventoryStatusFilter"><option value="all">All states</option><option value="confirmed">Identity confirmed</option><option value="updated">Identity updated</option><option value="review">Requires review</option><option value="new">New identity</option></select></label>
-                <label class="inventory-check-filter"><input id="inventoryChangesFilter" type="checkbox" /> Has recent changes</label>
-                <label class="inventory-check-filter"><input id="inventoryPendingFilter" type="checkbox" /> Review pending</label>
-              </div>
-            </div>
-            <div id="switchInventory" class="switch-inventory" aria-live="polite"></div>
-          </section>
-          <section
-            id="reviews-panel"
-            class="admin-panel"
-            role="tabpanel"
-            aria-labelledby="reviews-tab"
-            data-admin-panel="reviews"
-            hidden
-          >
-            <div class="review-center-header">
-              <div><span class="workspace-label">Evidence governance</span><h3>Admin Review Center</h3><p>Verify identity changes and protect the evidence chain without changing original records.</p></div>
-              <div class="review-header-actions"><button id="refreshAdminReviewsBtn" class="button secondary" type="button">Refresh reviews</button><button id="retryAdminNasBtn" class="button" type="button">Retry NAS sync</button></div>
-            </div>
-            <div id="adminReviewSummary" class="review-summary-grid"></div>
-            <div class="review-center-layout">
-              <section class="panel review-queue-panel">
-                <div class="directory-toolbar"><label class="search-label">Find a review<input id="adminReviewSearch" type="search" placeholder="Switch, port, workstation, or evidence ID" /></label><span id="adminReviewStatus" class="inline-status" role="status"></span></div>
-                <div id="adminReviewRows" class="table-scroll"></div>
-              </section>
-              <section id="adminReviewDetail" class="panel review-detail-panel" aria-label="Review detail"><div class="empty-state"><h3>Select a review</h3><p>Choose an item to compare current and previous evidence.</p></div></section>
-            </div>
-          </section>
+
           <section
             id="accounts-panel"
             class="admin-panel active"
@@ -708,40 +965,46 @@
           >
             <div class="account-overview">
               <div>
-                <span class="workspace-label">Access directory</span>
                 <h3>Approved accounts</h3>
                 <p>
-                  Approve a Windows domain username. Each person adds their name
-                  at first sign-in.
+                  Approve Windows domain usernames. People add their names at
+                  first sign-in.
                 </p>
               </div>
               <div class="account-actions">
-                <span id="accountCount" class="badge">Loading accounts</span>
-                <button
+                <span id="accountCount" class="badge">Loading accounts…</span
+                ><button
                   id="openAccountDialogBtn"
                   class="button primary"
                   type="button"
                 >
-                  Approve account
-                </button>
-                <button
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#plus" /></svg
+                  >Approve account</button
+                ><button
                   id="openAdminPasswordDialogBtn"
                   class="button secondary"
                   type="button"
                 >
-                  Security
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#key" /></svg
+                  >Password
                 </button>
               </div>
             </div>
-            <section class="panel directory-panel account-directory-panel">
+            <section
+              class="panel directory-panel account-directory-panel"
+              aria-label="Approved account directory"
+            >
               <div class="directory-toolbar">
-                <label class="search-label"
-                  >Find an account<input
+                <label class="search-label" for="accountSearch"
+                  >Search accounts<input
                     id="accountSearch"
                     type="search"
-                    placeholder="Search account or name" /></label
-                ><label
-                  >Status<select id="accountFilter">
+                    placeholder="Domain username or full name"
+                    autocomplete="off" /></label
+                ><label for="accountFilter"
+                  >Access status<select id="accountFilter">
                     <option value="all">All accounts</option>
                     <option value="enabled">Approved</option>
                     <option value="disabled">Disabled</option>
@@ -769,6 +1032,7 @@
               <p id="accountsStatus" class="inline-status" role="status"></p>
             </section>
           </section>
+
           <section
             id="general-panel"
             class="admin-panel"
@@ -779,8 +1043,8 @@
           >
             <div class="general-overview panel">
               <div>
-                <span class="workspace-label">Storage health</span>
-                <h3 id="adminStorageMode">Checking storage</h3>
+                <p class="workspace-label">Storage status</p>
+                <h3 id="adminStorageMode">Checking storage…</h3>
                 <p id="adminArchiveRepository">
                   Reading archive configuration.
                 </p>
@@ -788,10 +1052,16 @@
                   No sync requested in this session.
                 </p>
               </div>
-              <div>
-                <span id="adminPendingCache" class="badge">Checking cache</span
-                ><button id="syncCacheBtn" class="button" type="button">
-                  Sync pending cache
+              <div class="review-header-actions">
+                <span id="adminPendingCache" class="badge">Checking cache…</span
+                ><button
+                  id="syncCacheBtn"
+                  class="button secondary"
+                  type="button"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#arrow-path" /></svg
+                  >Sync pending cache
                 </button>
               </div>
             </div>
@@ -823,185 +1093,209 @@
                 </nav>
                 <fieldset id="settingsFields" disabled>
                   <div class="settings-section">
-                    <h2>Evidence storage</h2>
-                    <p>
-                      Each completed capture is saved to the configured history
-                      folder.
-                    </p>
-                    <label for="localHistoryInput"
-                      >History folder<input
-                        id="localHistoryInput"
-                        type="text"
-                        spellcheck="false"
-                        required
-                        aria-describedby="historyHelp" /></label
-                    ><small id="historyHelp"
-                      >Use a full Windows path. A network path sends records to
-                      that location.</small
-                    >
-                    <label class="check-row"
-                      ><input id="allowNasMirrorInput" type="checkbox" /><span
-                        >Allow archive mirroring<small
-                          >Copy new evidence to a second location when an
-                          archive path is set.</small
-                        ></span
-                      ></label
-                    >
-                    <label for="archiveMirrorInput"
-                      >Archive folder <span class="optional">Optional</span
-                      ><input
-                        id="archiveMirrorInput"
-                        type="text"
-                        spellcheck="false"
-                        placeholder="\\server\share\JackPeek"
-                        aria-describedby="archiveHelp" /></label
-                    ><small id="archiveHelp"
-                      >Archive copies have separate access and retention rules.
-                      A local save does not confirm that a mirror was
-                      saved.</small
-                    >
-                    <label for="storageModeInput"
-                      >Storage mode<select id="storageModeInput">
-                        <option value="local-nas-mirror">
-                          Local history with NAS mirror
-                        </option>
-                        <option value="nas-only-encrypted-cache">
-                          NAS primary with encrypted local cache
-                        </option>
-                        <option value="local-only">Local history only</option>
-                      </select></label
-                    >
-                    <label for="localCachePathInput"
-                      >Pending cache folder<input
-                        id="localCachePathInput"
-                        type="text"
-                        spellcheck="false"
-                        aria-describedby="cacheHelp" /></label
-                    ><small id="cacheHelp"
-                      >Used when NAS storage is temporarily unavailable.</small
-                    >
-                    <label for="cacheExpirationHoursInput"
-                      >Cache expiration (hours)<input
-                        id="cacheExpirationHoursInput"
-                        type="number"
-                        min="1"
-                        max="168"
-                        step="1"
-                        value="24"
-                        required
-                    /></label>
-                    <label for="nasSyncIntervalMinutesInput"
-                      >NAS sync interval (minutes)<input
-                        id="nasSyncIntervalMinutesInput"
-                        type="number"
-                        min="5"
-                        max="1440"
-                        step="1"
-                        value="60"
-                        required
-                    /></label>
-                    <label class="check-row"
-                      ><input
-                        id="adminManagedCacheEncryptionInput"
-                        type="checkbox"
-                      /><span
-                        >Use administrator managed cache encryption<small
-                          >Protect pending evidence cache using Windows data
-                          protection.</small
-                        ></span
-                      ></label
-                    >
-                    <label class="check-row"
-                      ><input
-                        id="requireEvidenceEncryptionInput"
-                        type="checkbox"
-                      /><span
-                        >Encrypt new evidence files<small
-                          >Windows user encryption (DPAPI). Exports are readable
-                          files. Other Windows accounts may be unable to read
-                          encrypted archive copies.</small
-                        ></span
-                      ></label
-                    >
+                    <div class="settings-section-heading">
+                      <h2>Evidence storage</h2>
+                      <p>
+                        Choose where completed captures and pending records are
+                        kept.
+                      </p>
+                    </div>
+                    <div class="field-grid">
+                      <label class="field-span-full" for="localHistoryInput"
+                        >History folder<input
+                          id="localHistoryInput"
+                          type="text"
+                          spellcheck="false"
+                          required
+                          aria-describedby="historyHelp"
+                        /><small id="historyHelp"
+                          >Use a full Windows path. A network path saves records
+                          to that location.</small
+                        ></label
+                      >
+                      <label class="check-row field-span-full"
+                        ><input id="allowNasMirrorInput" type="checkbox" /><span
+                          >Mirror evidence to an archive<small
+                            >Copy new evidence to a second location when an
+                            archive path is set.</small
+                          ></span
+                        ></label
+                      >
+                      <label class="field-span-full" for="archiveMirrorInput"
+                        >Archive folder <span class="optional">Optional</span
+                        ><input
+                          id="archiveMirrorInput"
+                          type="text"
+                          spellcheck="false"
+                          placeholder="\\server\share\JackPeek"
+                          aria-describedby="archiveHelp"
+                        /><small id="archiveHelp"
+                          >Archive copies have separate access and retention
+                          rules. Check sync status to confirm delivery.</small
+                        ></label
+                      >
+                      <label class="field-span-full" for="storageModeInput"
+                        >Storage mode<select id="storageModeInput">
+                          <option value="local-nas-mirror">
+                            Local history with NAS mirror
+                          </option>
+                          <option value="nas-only-encrypted-cache">
+                            NAS primary with encrypted local cache
+                          </option>
+                          <option value="local-only">Local history only</option>
+                        </select></label
+                      >
+                      <label class="field-span-full" for="localCachePathInput"
+                        >Pending cache folder<input
+                          id="localCachePathInput"
+                          type="text"
+                          spellcheck="false"
+                          aria-describedby="cacheHelp"
+                        /><small id="cacheHelp"
+                          >Holds pending evidence when NAS storage is
+                          unavailable.</small
+                        ></label
+                      >
+                      <label for="cacheExpirationHoursInput"
+                        >Cache expiration, hours<input
+                          id="cacheExpirationHoursInput"
+                          type="number"
+                          min="1"
+                          max="168"
+                          step="1"
+                          value="24"
+                          required
+                      /></label>
+                      <label for="nasSyncIntervalMinutesInput"
+                        >NAS sync interval, minutes<input
+                          id="nasSyncIntervalMinutesInput"
+                          type="number"
+                          min="5"
+                          max="1440"
+                          step="1"
+                          value="60"
+                          required
+                      /></label>
+                      <label class="check-row field-span-full"
+                        ><input
+                          id="adminManagedCacheEncryptionInput"
+                          type="checkbox"
+                        /><span
+                          >Administrator managed cache encryption<small
+                            >Protect pending evidence with Windows data
+                            protection.</small
+                          ></span
+                        ></label
+                      >
+                      <label class="check-row field-span-full"
+                        ><input
+                          id="requireEvidenceEncryptionInput"
+                          type="checkbox"
+                        /><span
+                          >Encrypt new evidence files<small
+                            >Uses Windows user encryption. Exports remain
+                            readable; other accounts may be unable to open
+                            encrypted archive copies.</small
+                          ></span
+                        ></label
+                      >
+                    </div>
                   </div>
                   <div class="settings-section">
-                    <h2>Identity and retention</h2>
-                    <label class="check-row"
-                      ><input id="includeUserInput" type="checkbox" /><span
-                        >Record Windows user identity<small
-                          >Include saved name, username, domain, and user SID in
-                          new evidence. Workstation name is always
-                          recorded.</small
-                        ></span
-                      ></label
-                    >
-                    <label class="check-row"
-                      ><input
-                        id="allowEvidenceDeletionInput"
-                        type="checkbox"
-                      /><span
-                        >Allow evidence deletion<small
-                          >Enable manual deletion and age-based cleanup in the
-                          history folder. Archive copies and exports are not
-                          removed.</small
-                        ></span
-                      ></label
-                    >
-                    <label for="evidenceRetentionDaysInput"
-                      >Retention (days)<input
-                        id="evidenceRetentionDaysInput"
-                        type="number"
-                        min="0"
-                        max="36500"
-                        step="1"
-                        value="0"
-                        required
-                        aria-describedby="retentionHelp" /></label
-                    ><small id="retentionHelp"
-                      >0 keeps records indefinitely. Cleanup runs when saving a
-                      capture, only if deletion is allowed, using file
-                      modification age.</small
-                    >
+                    <div class="settings-section-heading">
+                      <h2>Identity &amp; retention</h2>
+                      <p>
+                        Control who is recorded and how long local evidence is
+                        kept.
+                      </p>
+                    </div>
+                    <div class="field-grid">
+                      <label class="check-row field-span-full"
+                        ><input id="includeUserInput" type="checkbox" /><span
+                          >Record Windows user identity<small
+                            >Include saved name, username, domain, and SID in
+                            new evidence. Workstation name is always
+                            recorded.</small
+                          ></span
+                        ></label
+                      >
+                      <label class="check-row field-span-full"
+                        ><input
+                          id="allowEvidenceDeletionInput"
+                          type="checkbox"
+                        /><span
+                          >Allow evidence deletion<small
+                            >Enable manual deletion and age-based cleanup of
+                            local history. Archive copies and exports
+                            remain.</small
+                          ></span
+                        ></label
+                      >
+                      <label
+                        class="field-span-full"
+                        for="evidenceRetentionDaysInput"
+                        >Retention, days<input
+                          id="evidenceRetentionDaysInput"
+                          type="number"
+                          min="0"
+                          max="36500"
+                          step="1"
+                          value="0"
+                          required
+                          aria-describedby="retentionHelp"
+                        /><small id="retentionHelp"
+                          >0 keeps records indefinitely. When deletion is
+                          allowed, saving a capture runs cleanup using file
+                          modification age.</small
+                        ></label
+                      >
+                    </div>
                   </div>
                   <div class="settings-section">
-                    <h2>Capture policy</h2>
-                    <label for="maxCaptureDurationInput"
-                      >Maximum capture duration (seconds)<input
-                        id="maxCaptureDurationInput"
-                        type="number"
-                        min="5"
-                        max="120"
-                        step="1"
-                        value="120"
-                        required
-                    /></label>
-                    <label class="check-row"
-                      ><input
-                        id="requireValidLicenseInput"
-                        type="checkbox"
-                      /><span
-                        >Require a valid offline license<small
-                          >Block captures when no valid license is
-                          installed.</small
-                        ></span
-                      ></label
-                    >
-                    <label class="check-row"
-                      ><input
-                        id="allowSettingsEditInput"
-                        type="checkbox"
-                      /><span
-                        >Allow settings editing<small
-                          >Turning this off locks this form after saving.
-                          Re-enabling it requires editing the local settings
-                          file.</small
-                        ></span
-                      ></label
-                    >
+                    <div class="settings-section-heading">
+                      <h2>Capture policy</h2>
+                      <p>Set the limits for captures on this workstation.</p>
+                    </div>
+                    <div class="field-grid">
+                      <label
+                        class="field-span-full"
+                        for="maxCaptureDurationInput"
+                        >Maximum listen time, seconds<input
+                          id="maxCaptureDurationInput"
+                          type="number"
+                          min="5"
+                          max="120"
+                          step="1"
+                          value="120"
+                          required
+                      /></label>
+                      <label class="check-row field-span-full"
+                        ><input
+                          id="requireValidLicenseInput"
+                          type="checkbox"
+                        /><span
+                          >Require a valid offline license<small
+                            >Prevent captures when a valid license is not
+                            installed.</small
+                          ></span
+                        ></label
+                      >
+                      <label class="check-row field-span-full"
+                        ><input
+                          id="allowSettingsEditInput"
+                          type="checkbox"
+                        /><span
+                          >Allow settings editing<small
+                            >Turning this off locks the form after saving.
+                            Re-enable it in the local settings file.</small
+                          ></span
+                        ></label
+                      >
+                    </div>
                   </div>
                 </fieldset>
                 <div class="form-footer">
-                  <p id="settingsStatus" role="status">Loading settings...</p>
+                  <p id="settingsStatus" role="status">Loading settings…</p>
                   <button
                     id="saveSettingsBtn"
                     class="button primary"
@@ -1012,19 +1306,26 @@
                   </button>
                 </div>
               </form>
-              <aside class="settings-aside">
+              <aside
+                class="settings-aside"
+                aria-label="Workstation information"
+              >
                 <section class="panel aside-section">
                   <h2>Offline license</h2>
                   <p id="licenseStatus" class="badge">Checking</p>
                   <p id="licenseDetail">Reading license status.</p>
                   <label for="licenseFileInput"
-                    >Import license file<input
+                    >Import license<input
                       id="licenseFileInput"
                       type="file"
                       accept=".lic,.json"
                   /></label>
-                  <p id="licenseImportStatus" role="status">
-                    License validation runs on this workstation.
+                  <p
+                    id="licenseImportStatus"
+                    class="inline-status"
+                    role="status"
+                  >
+                    Validated on this workstation.
                   </p>
                 </section>
                 <section class="panel aside-section">
@@ -1032,47 +1333,273 @@
                   <dl class="stacked-fields">
                     <div>
                       <dt>Windows user</dt>
-                      <dd id="sessionUser">Loading</dd>
+                      <dd id="sessionUser">Loading…</dd>
                     </div>
                     <div>
                       <dt>Application</dt>
                       <dd>JackPeek 1.0</dd>
                     </div>
                     <div>
-                      <dt>Capture method</dt>
-                      <dd>Passive LLDP / CDP</dd>
+                      <dt>Port discovery</dt>
+                      <dd>Passive switch advertisements</dd>
+                    </div>
+                    <div>
+                      <dt>Speed Test</dt>
+                      <dd>Active HTTPS test via Cloudflare</dd>
                     </div>
                   </dl>
                   <p>
-                    The capture engine listens for advertisements. It does not
-                    test connectivity, measure PoE, or change switch settings.
+                    Port discovery reads advertised information. It does not
+                    measure PoE or change switch settings.
                   </p>
                 </section>
                 <section class="panel aside-section">
-                  <h2>Data and usage</h2>
+                  <h2>Data &amp; usage</h2>
                   <p>
-                    Read what JackPeek records, where evidence is stored, and
-                    the conditions of use.
+                    What is recorded, where it is kept, and how to use JackPeek.
                   </p>
-                  <a href="/privacy">Privacy Policy</a
-                  ><a href="/terms">Terms &amp; Conditions</a>
+                  <a href="/privacy"
+                    >Privacy Policy<svg class="icon" aria-hidden="true">
+                      <use href="/assets/heroicons.svg#arrow-right" /></svg></a
+                  ><a href="/terms"
+                    >Terms &amp; Conditions<svg class="icon" aria-hidden="true">
+                      <use href="/assets/heroicons.svg#arrow-right" /></svg
+                  ></a>
                 </section>
               </aside>
             </div>
+          </section>
+
+          <section
+            id="reviews-panel"
+            class="admin-panel"
+            role="tabpanel"
+            aria-labelledby="reviews-tab"
+            data-admin-panel="reviews"
+            hidden
+          >
+            <div class="review-center-header">
+              <div>
+                <h3>Review Center</h3>
+                <p>
+                  Review identity changes while preserving the original
+                  evidence.
+                </p>
+              </div>
+              <div class="review-header-actions">
+                <button
+                  id="refreshAdminReviewsBtn"
+                  class="button secondary"
+                  type="button"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#arrow-path" /></svg
+                  >Refresh reviews</button
+                ><button
+                  id="retryAdminNasBtn"
+                  class="button secondary"
+                  type="button"
+                >
+                  Retry NAS sync
+                </button>
+              </div>
+            </div>
+            <div id="adminReviewSummary" class="review-summary-grid"></div>
+            <div class="review-center-layout">
+              <section
+                class="panel review-queue-panel"
+                aria-label="Review queue"
+              >
+                <div class="directory-toolbar">
+                  <label class="search-label" for="adminReviewSearch"
+                    >Search reviews<input
+                      id="adminReviewSearch"
+                      type="search"
+                      placeholder="Switch, port, workstation, or evidence ID"
+                      autocomplete="off" /></label
+                  ><span
+                    id="adminReviewStatus"
+                    class="inline-status"
+                    role="status"
+                  ></span>
+                </div>
+                <div
+                  id="adminReviewRows"
+                  class="table-scroll"
+                  tabindex="0"
+                  role="region"
+                  aria-label="Evidence awaiting review"
+                ></div>
+              </section>
+              <section
+                id="adminReviewDetail"
+                class="panel review-detail-panel"
+                aria-label="Review detail"
+              >
+                <div class="empty-state">
+                  <div class="empty-symbol" aria-hidden="true">
+                    <svg class="icon">
+                      <use href="/assets/heroicons.svg#shield-check" />
+                    </svg>
+                  </div>
+                  <h3>Choose a review</h3>
+                  <p>
+                    Compare the current and previous evidence, then record your
+                    decision.
+                  </p>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section
+            id="inventory-panel"
+            class="admin-panel"
+            role="tabpanel"
+            aria-labelledby="inventory-tab"
+            data-admin-panel="inventory"
+            hidden
+          >
+            <div class="review-center-header">
+              <div>
+                <h3>Switch inventory</h3>
+                <p>
+                  Switches identified in your saved captures and port records.
+                </p>
+              </div>
+              <div class="review-header-actions">
+                <span id="inventoryCount" class="badge">0 switches</span
+                ><button
+                  id="refreshInventoryBtn"
+                  class="button secondary"
+                  type="button"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/heroicons.svg#arrow-path" /></svg
+                  >Refresh inventory
+                </button>
+              </div>
+            </div>
+            <div class="directory-toolbar inventory-toolbar">
+              <label class="search-label" for="inventorySearch"
+                >Search switches<input
+                  id="inventorySearch"
+                  type="search"
+                  placeholder="Name, IP, MAC, model, or port"
+                  autocomplete="off" /></label
+              ><button
+                id="inventoryFiltersToggle"
+                class="button secondary filter-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="inventoryFilters"
+              >
+                <span>Filters</span
+                ><span class="filter-toggle-chevron" aria-hidden="true"></span>
+              </button>
+              <div
+                id="inventoryFilters"
+                class="inventory-filter-options"
+                aria-label="Inventory filters"
+              >
+                <label for="inventoryStatusFilter"
+                  >Identity status<select id="inventoryStatusFilter">
+                    <option value="all">All states</option>
+                    <option value="confirmed">Identity confirmed</option>
+                    <option value="updated">Identity updated</option>
+                    <option value="review">Requires review</option>
+                    <option value="new">New identity</option>
+                  </select></label
+                ><label class="inventory-check-filter"
+                  ><input id="inventoryChangesFilter" type="checkbox" />Recent
+                  changes</label
+                ><label class="inventory-check-filter"
+                  ><input id="inventoryPendingFilter" type="checkbox" />Review
+                  pending</label
+                >
+              </div>
+            </div>
+            <div
+              id="switchInventory"
+              class="switch-inventory"
+              aria-live="polite"
+            ></div>
+          </section>
+
+          <section
+            id="technical-panel"
+            class="admin-panel technical-review"
+            role="tabpanel"
+            aria-labelledby="technical-tab"
+            data-admin-panel="technical"
+            hidden
+          >
+            <div class="technical-heading">
+              <div>
+                <h3>Technical Review</h3>
+                <p id="technicalBuild">Loading reviewed build…</p>
+              </div>
+              <button
+                id="exportTechnicalReview"
+                class="button secondary"
+                type="button"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#arrow-down-tray" /></svg
+                >Export review
+              </button>
+            </div>
+            <div
+              id="technicalCapabilities"
+              class="technical-capabilities"
+              aria-label="Verified capabilities"
+            ></div>
+            <p class="technical-assessment">
+              Conditional evaluation. Open security and deployment risks remain.
+            </p>
+            <div class="technical-toolbar">
+              <label for="technicalSearch"
+                >Search the review<input
+                  id="technicalSearch"
+                  type="search"
+                  placeholder="Network, cookies, NAS, or permissions"
+                  autocomplete="off" /></label
+              ><button
+                id="refreshTechnicalReview"
+                class="button secondary"
+                type="button"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/heroicons.svg#arrow-path" /></svg
+                >Refresh review
+              </button>
+            </div>
+            <p
+              id="technicalStatus"
+              class="inline-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <div
+              id="technicalSections"
+              class="technical-reader"
+              aria-label="Technical review reader"
+            ></div>
           </section>
         </section>
       </section>
       <noscript
         ><div class="notice error">
-          JavaScript is required for capture controls and evidence history. The
-          privacy and terms pages remain available.
+          Enable JavaScript to sign in, capture ports, and review evidence.
+          Privacy and terms pages are available without JavaScript.
         </div></noscript
       >
     </main>
+
     <footer class="shell footer">
       <span
-        >JackPeek 1.0 <span class="footer-divider">/</span> Local Ethernet
-        utility</span
+        >JackPeek 1.0 <span class="footer-divider">/</span> Designed by
+        SysSummit</span
       >
       <nav aria-label="Legal and project">
         <a href="/privacy">Privacy Policy</a
@@ -1081,10 +1608,13 @@
           href="https://github.com/joshalmo00/jackpeek"
           target="_blank"
           rel="noopener noreferrer"
-          >Project source<span class="sr-only"> (opens in a new tab)</span></a
+          >Project source<svg class="icon" aria-hidden="true">
+            <use href="/assets/heroicons.svg#arrow-top-right-on-square" /></svg
+          ><span class="sr-only"> (opens in a new tab)</span></a
         >
       </nav>
     </footer>
+
     <div
       id="npcapDialog"
       class="modal-backdrop"
@@ -1096,22 +1626,38 @@
     >
       <section class="modal-panel">
         <div class="modal-heading">
-          <img src="/assets/port-checker.png" width="38" height="38" alt="" />
+          <span class="icon-tile warning" aria-hidden="true"
+            ><svg class="icon">
+              <use href="/assets/heroicons.svg#exclamation-triangle" /></svg
+          ></span>
           <div>
-            <h2 id="npcapDialogTitle">Capture driver required</h2>
+            <span class="badge warning">Setup required</span>
+            <h2 id="npcapDialogTitle">Set up port capture</h2>
             <p id="npcapDialogDescription">
-              JackPeek can see the wired adapter, but Windows has not exposed an
-              Npcap capture device for it.
+              Install Npcap to let JackPeek listen for switch advertisements on
+              your wired adapter.
             </p>
           </div>
         </div>
         <ol class="setup-steps">
-          <li>Download Npcap from the official Nmap project website.</li>
-          <li>Run the installer using your organization approved settings.</li>
-          <li>Restart JackPeek or choose Check again after installation.</li>
+          <li>
+            <strong>Download Npcap</strong
+            ><span>Open the official Nmap project website.</span>
+          </li>
+          <li>
+            <strong>Install with approval</strong
+            ><span>Use your organization's approved installer settings.</span>
+          </li>
+          <li>
+            <strong>Check your connection</strong
+            ><span
+              >Select Check again, or restart JackPeek after installation.</span
+            >
+          </li>
         </ol>
         <p class="modal-note">
-          JackPeek does not bundle, redistribute, or silently install Npcap.
+          Npcap is installed separately. JackPeek does not bundle it or install
+          it silently.
         </p>
         <div class="modal-actions">
           <a
@@ -1120,17 +1666,22 @@
             href="https://npcap.com/#download"
             target="_blank"
             rel="noopener noreferrer"
-            >Open Npcap download</a
-          >
-          <button id="npcapCheckBtn" class="button secondary" type="button">
-            Check again
-          </button>
-          <button id="npcapDismissBtn" class="button secondary" type="button">
+            >Open Npcap website<svg class="icon" aria-hidden="true">
+              <use
+                href="/assets/heroicons.svg#arrow-top-right-on-square"
+              /></svg
+            ><span class="sr-only"> (opens in a new tab)</span></a
+          ><button id="npcapCheckBtn" class="button secondary" type="button">
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/heroicons.svg#arrow-path" /></svg
+            >Check again</button
+          ><button id="npcapDismissBtn" class="button secondary" type="button">
             Not now
           </button>
         </div>
       </section>
     </div>
+
     <div
       id="adminLoginDialog"
       class="auth-screen admin-login-screen"
@@ -1142,17 +1693,22 @@
     >
       <section class="auth-card admin-login-panel">
         <div class="auth-brand">
-          <img src="/assets/port-checker.png" width="44" height="44" alt="" />
+          <img src="/assets/jackpeek-mark.svg" width="56" height="56" alt="" />
           <div>
-            <strong>JackPeek</strong>
-            <span>Administration by <b class="sys-summit-wordmark"><i>SYS</i>SUMMIT</b></span>
+            <strong>JackPeek</strong
+            ><span
+              >Designed by <b class="sys-summit-wordmark">SysSummit</b></span
+            >
           </div>
         </div>
-        <p class="workspace-label">Administrator access</p>
-        <h1 id="adminLoginTitle">Administrator Login</h1>
+        <span class="badge"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/heroicons.svg#lock-closed" /></svg
+          >Administrator access</span
+        >
+        <h1 id="adminLoginTitle" tabindex="-1">Administrator sign-in</h1>
         <p id="adminLoginDescription">
-          Enter the workstation administrator password to open Workspace
-          settings.
+          Enter the JackPeek administrator password for this installation.
         </p>
         <form id="adminPortalForm" class="stack-form">
           <label for="adminPortalPasswordInput"
@@ -1160,9 +1716,8 @@
               id="adminPortalPasswordInput"
               type="password"
               autocomplete="current-password"
-              required
-          /></label>
-          <label id="adminConfirmLabel" hidden
+              required /></label
+          ><label id="adminConfirmLabel" for="adminConfirmInput" hidden
             >Confirm administrator password<input
               id="adminConfirmInput"
               type="password"
@@ -1170,7 +1725,7 @@
               autocomplete="new-password"
           /></label>
           <p id="adminPortalStatus" class="inline-status" role="status">
-            Enter the administrator password to continue.
+            Enter your password to continue.
           </p>
           <div class="modal-actions">
             <button
@@ -1178,19 +1733,21 @@
               class="button primary"
               type="submit"
             >
-              Sign in
-            </button>
-            <button
+              Sign in<svg class="icon" aria-hidden="true">
+                <use href="/assets/heroicons.svg#arrow-right" />
+              </svg></button
+            ><button
               id="adminPortalCancelBtn"
               class="button secondary"
               type="button"
             >
-              Cancel
+              Back to sign-in
             </button>
           </div>
         </form>
       </section>
     </div>
+
     <div
       id="accountDialog"
       class="modal-backdrop"
@@ -1202,37 +1759,36 @@
     >
       <section class="modal-panel admin-action-modal">
         <div class="modal-heading">
-          <img src="/assets/port-checker.png" width="38" height="38" alt="" />
+          <span class="icon-tile" aria-hidden="true"
+            ><svg class="icon"><use href="/assets/heroicons.svg#users" /></svg
+          ></span>
           <div>
             <h2 id="accountDialogTitle">Approve an account</h2>
             <p id="accountDialogDescription">
-              Use the exact domain and username reported by Windows.
+              Enter the Windows domain and username, exactly as reported by
+              Windows.
             </p>
           </div>
         </div>
         <form id="accountForm" class="stack-form">
-          <label
+          <label for="accountInput"
             >Windows account<input
               id="accountInput"
               placeholder="SBHCS\joalvarez"
               autocomplete="off"
               spellcheck="false"
               maxlength="180"
-              required /></label
-          ><p class="modal-note">
-            Approvals and names are stored on this installation. Each person
-            adds their name at first sign-in.
+              required
+          /></label>
+          <p class="modal-note">
+            Use a domain username, not an email address. Approvals stay on this
+            installation. Each person adds their name at first sign-in.
           </p>
-          <p id="accountFormStatus" role="status"></p>
+          <p id="accountFormStatus" class="inline-status" role="status"></p>
           <div class="modal-actions">
-            <button
-              id="approveAccountBtn"
-              class="button primary"
-              type="submit"
-            >
-              Approve account
-            </button>
-            <button
+            <button id="approveAccountBtn" class="button primary" type="submit">
+              Approve account</button
+            ><button
               id="cancelAccountDialogBtn"
               class="button secondary"
               type="button"
@@ -1243,6 +1799,7 @@
         </form>
       </section>
     </div>
+
     <div
       id="adminPasswordDialog"
       class="modal-backdrop"
@@ -1254,37 +1811,43 @@
     >
       <section class="modal-panel admin-action-modal">
         <div class="modal-heading">
-          <img src="/assets/port-checker.png" width="38" height="38" alt="" />
+          <span class="icon-tile" aria-hidden="true"
+            ><svg class="icon"><use href="/assets/heroicons.svg#key" /></svg
+          ></span>
           <div>
-            <h2 id="adminPasswordDialogTitle">Administrator password</h2>
+            <h2 id="adminPasswordDialogTitle">Change administrator password</h2>
             <p id="adminPasswordDialogDescription">
-              Change the password for this installation. Saving signs out active
+              Update this installation's password. Saving signs out active
               administrator sessions.
             </p>
           </div>
         </div>
         <form id="adminPasswordForm" class="stack-form">
-          <label
+          <label for="currentAdminPasswordInput"
             >Current password<input
               id="currentAdminPasswordInput"
               type="password"
               autocomplete="current-password"
               required /></label
-          ><label
+          ><label for="newAdminPasswordInput"
             >New password<input
               id="newAdminPasswordInput"
               type="password"
               minlength="10"
               autocomplete="new-password"
-              required /></label
-          ><p id="adminPasswordStatus" role="status">
+              required
+          /></label>
+          <p id="adminPasswordStatus" class="inline-status" role="status">
             Use at least 10 characters.
           </p>
           <div class="modal-actions">
-            <button id="saveAdminPasswordBtn" class="button primary" type="submit">
-              Update password
-            </button>
             <button
+              id="saveAdminPasswordBtn"
+              class="button primary"
+              type="submit"
+            >
+              Update password</button
+            ><button
               id="cancelAdminPasswordDialogBtn"
               class="button secondary"
               type="button"

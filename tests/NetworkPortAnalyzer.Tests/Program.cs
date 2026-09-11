@@ -23,6 +23,8 @@ var tests = new (string Name, Action Test)[]
     ("admin setup persists without an embedded credential", Tests.AdminCredentials),
     ("redacts credential-bearing audit details", Tests.AuditRedaction),
     ("NAS-only does not create a plaintext local ledger", Tests.NasLedgerPrivacy),
+    ("NAS-primary evidence keeps seven-day local cache after upload", Tests.NasPrimaryCacheRetention),
+    ("pending NAS evidence is retained until upload succeeds", Tests.PendingNasCacheRetained),
     ("bounds parser input and TLV counts", Tests.ParserLimits),
     ("handles malformed and truncated discovery packets", Tests.MalformedPackets),
     ("leaves missing advertised fields unset", Tests.MissingFields),
@@ -99,6 +101,57 @@ internal static class Tests
             var store = new PortLedgerStore(() => settings);
             store.Save(Evidence("nas", DateTimeOffset.UtcNow, [Observation("LLDP", "SW", "mac", "Gi1/1", 10, null, DateTimeOffset.UtcNow)]));
             Assert(!Directory.Exists(Path.Combine(root, "PortLedger")), "no unencrypted ledger side copy");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    public static void NasPrimaryCacheRetention()
+    {
+        var root = TempRoot();
+        try
+        {
+            var store = new EvidenceStore(new WindowsIdentityService(), Path.Combine(root, "settings"));
+            Assert(store.GetSettings().StorageMode == EvidenceStore.StorageNasOnlyWithCache, "NAS-primary mode is the default storage mode");
+            var local = Path.Combine(root, "local");
+            var cache = Path.Combine(root, "cache");
+            var archive = Path.Combine(root, "nas");
+            store.SaveSettings(new EvidenceSettingsUpdate(
+                null, null, local, archive, null, null, null, null, null, null, true, null,
+                EvidenceStore.StorageNasOnlyWithCache, cache, EvidenceStore.SyncedCacheRetentionHours, [24, 12], null, null), force: true);
+            var saved = store.SaveScan(Scan("retained"), Identity());
+            Assert(saved.Summary.StorageState == "nas-synced", "evidence uploads to NAS when archive is reachable");
+            var cacheFile = Directory.EnumerateFiles(cache, "*.dpapi", SearchOption.AllDirectories).Single();
+            Assert(store.ListPendingCache().Count == 0, "uploaded cache is retained locally but not pending");
+            var health = store.GetNasHealth();
+            Assert(health.Connected, "NAS health sees writable archive");
+            Assert(health.RetainedLocalLogs == 1 && health.PendingUploadLogs == 0, "health counts retained cache separately from pending uploads");
+            File.SetLastWriteTimeUtc(cacheFile, DateTimeOffset.UtcNow.AddDays(-8).UtcDateTime);
+            var sync = store.SyncPendingCache();
+            Assert(sync.DeletedExpired == 1, "synced cache is cleaned after seven days");
+            Assert(!Directory.EnumerateFiles(cache, "*.dpapi", SearchOption.AllDirectories).Any(), "expired synced cache removed");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    public static void PendingNasCacheRetained()
+    {
+        var root = TempRoot();
+        try
+        {
+            var store = new EvidenceStore(new WindowsIdentityService(), Path.Combine(root, "settings"));
+            var blocker = Path.Combine(root, "nas-blocker");
+            File.WriteAllText(blocker, "not a directory");
+            var cache = Path.Combine(root, "cache");
+            store.SaveSettings(new EvidenceSettingsUpdate(
+                null, null, Path.Combine(root, "local"), blocker, null, null, null, null, null, null, true, null,
+                EvidenceStore.StorageNasOnlyWithCache, cache, EvidenceStore.SyncedCacheRetentionHours, [24, 12], null, null), force: true);
+            var saved = store.SaveScan(Scan("pending"), Identity());
+            Assert(saved.Summary.StorageState == "pending-nas-sync", "failed NAS upload leaves pending cache");
+            var cacheFile = Directory.EnumerateFiles(cache, "*.dpapi", SearchOption.AllDirectories).Single();
+            File.SetLastWriteTimeUtc(cacheFile, DateTimeOffset.UtcNow.AddDays(-30).UtcDateTime);
+            var sync = store.SyncPendingCache();
+            Assert(sync.DeletedExpired == 0 && sync.Failed == 1, "unsynced cache is not deleted by retention cleanup");
+            Assert(File.Exists(cacheFile), "pending cache remains available for later upload");
         }
         finally { Directory.Delete(root, true); }
     }
@@ -543,6 +596,19 @@ internal static class Tests
         var settings = TestSettings("C:\\JackPeekTest\\Evidence", null);
         var scan = new ScanResult(scanId, "adapter", createdAt, createdAt.AddSeconds(5), observations.Sum(o => o.FramesSeen), observations, null);
         return new EvidenceRecord(scanId, createdAt, workstation, settings, scan, "fixture");
+    }
+
+    private static WorkstationIdentity Identity()
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new WorkstationIdentity("TECH-LAPTOP", "CORP", "joalvarez", "S-1-5-21-fixture", "Windows", "1.0.0", now, "Joshua Alvarez");
+    }
+
+    private static ScanResult Scan(string scanId)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new ScanResult(scanId, "adapter", now, now.AddSeconds(5), 1,
+            [Observation("LLDP", "NB-TEST", "00:11:22:33:44:55", "Gi1/0/13", 2954, "192.0.2.10", now)], null);
     }
 
     private static Observation Observation(string protocol, string? device, string? chassis, string? port, int? vlan, string? managementIp, DateTimeOffset seen)

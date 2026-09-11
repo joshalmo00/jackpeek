@@ -21,7 +21,7 @@ public sealed class TechnicalReviewService
             buildVersion = Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? Assembly.GetName().Version?.ToString(),
             captureFilter = PassiveCaptureService.PassiveDiscoveryFilter,
-            capabilities = new[] { "Passive LLDP/CDP discovery", "Local processing", "No switch credentials", "No SNMP", "No SSH", "No port scanning" }
+            capabilities = new[] { "Passive port discovery", "Active HTTPS speed test", "Local evidence processing", "No switch credentials", "No SNMP", "No SSH", "No port scanning" }
         };
     }
 

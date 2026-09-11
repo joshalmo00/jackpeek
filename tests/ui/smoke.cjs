@@ -224,6 +224,39 @@ fs.mkdirSync(output, { recursive: true });
         body = { summary: {}, queue: [] };
       else if (url.pathname === "/api/reports") body = reports;
       else if (url.pathname === "/api/ports/log") body = portLog;
+      else if (url.pathname === "/api/nas/health")
+        body = {
+          state: "healthy",
+          connected: true,
+          archivePath: "DEMO/NAS",
+          retainedLocalLogs: 2,
+          pendingUploadLogs: 0,
+          expiringSoonLogs: 0,
+          nextExpiration: null,
+          lastError: null,
+          pending: [],
+        };
+      else if (url.pathname === "/api/nas/sync")
+        body = {
+          sync: {
+            pendingBefore: 0,
+            uploaded: 0,
+            deletedExpired: 0,
+            failed: 0,
+            lastError: null,
+          },
+          health: {
+            state: "healthy",
+            connected: true,
+            archivePath: "DEMO/NAS",
+            retainedLocalLogs: 2,
+            pendingUploadLogs: 0,
+            expiringSoonLogs: 0,
+            nextExpiration: null,
+            lastError: null,
+            pending: [],
+          },
+        };
       else if (url.pathname === "/api/ports/history")
         body = {
           entries: [

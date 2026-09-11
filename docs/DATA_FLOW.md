@@ -11,10 +11,11 @@ Local Windows APIs -> adapter state / counters / process identity
     -> loopback Kestrel API <-> local browser
        (HTTP; session cookies; no infrastructure authentication)
 
-EvidenceStore -> local files OR encrypted pending cache
+EvidenceStore -> encrypted local cache
     -> configured archive through OS filesystem I/O
        (active off-host traffic if network path; share authentication by OS)
     -> JSON / record-hash sidecar / CSV index / review metadata
+    -> successful upload retains encrypted local cache for 7 days
 
 Explicit export -> browser download (JSON / CSV / HTML / ZIP)
 Explicit vendor link -> external browser HTTPS navigation

@@ -4,8 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Privacy Policy | JackPeek</title>
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/ui-system.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -13,7 +14,7 @@
       <div class="shell topbar-inner">
         <a class="brand" href="/" aria-label="JackPeek capture"
           ><img
-            src="/assets/port-checker.png"
+            src="/assets/jackpeek-mark.svg"
             width="36"
             height="36"
             alt=""
@@ -33,7 +34,8 @@
         <p>
           This policy describes the Windows application distributed through the
           JackPeek project. It does not cover GitHub, Npcap, or other external
-          websites and services opened manually by the user.
+          websites and services, including Cloudflare, which supplies the
+          Speed Test.
         </p>
       </div>
       <div class="legal-layout">
@@ -50,9 +52,10 @@
             <h2>1. Local operation</h2>
             <p>
               JackPeek starts a web server bound to <code>127.0.0.1</code> and
-              opens an interface in your browser. The interface, fonts, and
-              graphics are bundled with the application. This version does not
-              include analytics, advertising, tracking cookies, or an automatic
+              opens an interface in your browser. The interface and graphics are
+              bundled with the application. Typography uses fonts already
+              available on your workstation. This version does not include
+              analytics, advertising, tracking cookies, or an automatic
               connection to a JackPeek cloud service.
             </p>
             <p>
@@ -62,9 +65,26 @@
               installed capture drivers may perform their own network activity.
             </p>
             <p>
-              The observed traffic panel reads local Windows adapter byte
-              counters. It does not generate test traffic or contact an external
-              measurement service.
+              The Speed Test starts after sign-in and sends HTTPS
+              download and upload requests to
+              <a
+                href="https://speed.cloudflare.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Cloudflare</a
+              >. It uses up to 40 MB of test data per run, plus network
+              overhead, and stops within 45 seconds. You can cancel it or run it
+              again. Cloudflare receives your public IP address and connection
+              metadata; JackPeek does not send switch information, capture
+              evidence, Windows identity, or stored records in these requests.
+              Results remain in the current browser session. Cloudflare handles
+              its service data under its own
+              <a
+                href="https://www.cloudflare.com/privacypolicy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Privacy Policy</a
+              >.
             </p>
           </section>
           <section id="records">
@@ -85,7 +105,8 @@
                 address, VLANs, capabilities, system details, and protocol TLV
                 metadata. New captures do not retain unknown TLV payload bytes.
                 Older evidence may contain values saved by an earlier build.
-                Unrelated packet payloads are not displayed or saved as evidence.
+                Unrelated packet payloads are not displayed or saved as
+                evidence.
               </li>
               <li>
                 Workstation name, operating system, application version,
@@ -96,9 +117,10 @@
                 identity is enabled. This setting is enabled by default.
               </li>
               <li>
-                Evidence history records for observed switch ports, including scan date,
-                switch, port, VLANs, management address, workstation, scanner
-                identity when enabled, and links back to the saved evidence.
+                Evidence history records for observed switch ports, including
+                scan date, switch, port, VLANs, management address, workstation,
+                scanner identity when enabled, and links back to the saved
+                evidence.
               </li>
             </ul>
             <p>
@@ -112,9 +134,10 @@
           <section id="storage">
             <h2>3. Storage and sharing</h2>
             <p>
-              By default, evidence is saved in
-              <code>%LOCALAPPDATA%\JackPeek\Evidence</code>. Settings, the
-              imported license, account directory, and <code>audit.jsonl</code> are stored under
+              By default, JackPeek treats the configured NAS or shared archive
+              as the primary evidence repository. Settings, the imported
+              license, account directory, encrypted local cache files, and
+              <code>audit.jsonl</code> are stored under
               <code>%LOCALAPPDATA%\JackPeek</code>. Evidence and settings files
               may contain network information and personal identifiers.
             </p>
@@ -125,18 +148,20 @@
               and included in future evidence, exports, and evidence history
               when identity recording is enabled. Disabling an account retains
               its name and does not change historical records. The account
-              directory is local to this installation and is not mirrored to NAS.
+              directory is local to this installation and is not mirrored to
+              NAS.
             </p>
             <p>
-              You can choose a different history folder, including a network
-              path. If archive mirroring is allowed and a destination is
-              configured, new evidence is also copied there when the location is
-              reachable. The application maintains its evidence history in the
-              configured history location. A local PortLedger may also be
-              maintained for identity matching and change detection, but it is
-              not exposed as a separate user-facing panel. These locations are
-              controlled by you or your organization. A local save can succeed
-              even if an archive copy fails.
+              You can configure the archive path in Settings. New evidence is
+              first written to encrypted local cache, then uploaded to the NAS
+              when the location is reachable. If upload succeeds, the encrypted
+              local cache copy is retained for 7 days, then cleaned during a
+              future sync. If upload fails, the local cache remains pending
+              until a later upload succeeds. A local PortLedger may also be
+              maintained for identity matching and change detection outside
+              NAS-primary mode, but it is not exposed as a separate user-facing
+              panel. These locations are controlled by you or your
+              organization.
             </p>
             <p>
               New evidence files are not encrypted by default. Optional Windows
@@ -172,6 +197,13 @@
               from Evidence history. Removing local evidence does not remove
               archive copies, exported files, backups, audit entries, or
               settings. Audit logs have no automatic expiry in this version.
+            </p>
+            <p>
+              The Capture screen includes a NAS health control. It checks
+              whether the configured archive path can be written, reports how
+              many encrypted cache records are retained locally, shows pending
+              uploads, warns when uploaded cache records are close to cleanup,
+              and can force a pending upload attempt.
             </p>
             <p>
               To remove other application data, close JackPeek and remove the

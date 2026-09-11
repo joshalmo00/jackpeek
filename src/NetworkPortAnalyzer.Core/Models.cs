@@ -194,7 +194,8 @@ public sealed record PendingEvidenceCacheItem(
     int HoursUntilExpiration,
     bool WarningDue,
     string CachePath,
-    string Sha256);
+    string Sha256,
+    bool UploadedToNas);
 
 public sealed record EvidenceSyncResult(
     int PendingBefore,
@@ -202,6 +203,19 @@ public sealed record EvidenceSyncResult(
     int DeletedExpired,
     int Failed,
     string? LastError);
+
+public sealed record NasHealthStatus(
+    bool NasEnabled,
+    bool ArchiveConfigured,
+    bool Connected,
+    string State,
+    string? ArchivePath,
+    int RetainedLocalLogs,
+    int PendingUploadLogs,
+    int ExpiringSoonLogs,
+    DateTimeOffset? NextExpiration,
+    string? LastError,
+    IReadOnlyList<PendingEvidenceCacheItem> Pending);
 
 public sealed record IdentityMatch(
     int Score,

@@ -12,6 +12,7 @@ public sealed class EvidenceStore
     public const string StorageLocalAndNasMirror = "local-nas-mirror";
     public const string StorageNasOnlyWithCache = "nas-only-encrypted-cache";
     public const string StorageLocalOnly = "local-only";
+    public const int SyncedCacheRetentionHours = 168;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -23,9 +24,16 @@ public sealed class EvidenceStore
 
     public EvidenceStore(WindowsIdentityService identity)
     {
-        _identity = identity;
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var root = Path.Combine(appData, "JackPeek");
+        _identity = identity;
+        Directory.CreateDirectory(root);
+        _settingsPath = Path.Combine(root, "settings.json");
+    }
+
+    internal EvidenceStore(WindowsIdentityService identity, string root)
+    {
+        _identity = identity;
         Directory.CreateDirectory(root);
         _settingsPath = Path.Combine(root, "settings.json");
     }
@@ -63,10 +71,10 @@ public sealed class EvidenceStore
             {
                 settings = settings with
                 {
-                    StorageMode = StorageLocalAndNasMirror,
+                    StorageMode = StorageNasOnlyWithCache,
                     LocalCachePath = DefaultCachePath(),
-                    CacheExpirationHours = 24,
-                    CacheWarningHours = [3, 2],
+                    CacheExpirationHours = SyncedCacheRetentionHours,
+                    CacheWarningHours = [24, 12],
                     NasSyncIntervalMinutes = 60,
                     AdminManagedCacheEncryption = true
                 };
@@ -160,8 +168,8 @@ public sealed class EvidenceStore
             var mirrorPath = TryMirrorToNas(record, settings, priorReview, out _);
             if (mirrorPath is not null)
             {
-                TryDelete(cachePath);
-                return new EvidenceSaveResult(ToSummary(record, null, mirrorPath, "nas-synced", null, priorReview), record);
+                TouchCacheRetentionClock(cachePath);
+                return new EvidenceSaveResult(ToSummary(record, cachePath, mirrorPath, "nas-synced", CacheExpiresAt(cachePath, settings), priorReview), record);
             }
 
             return new EvidenceSaveResult(ToSummary(record, cachePath, null, "pending-nas-sync", record.CreatedAt.AddHours(settings.CacheExpirationHours), priorReview), record);
@@ -214,8 +222,69 @@ public sealed class EvidenceStore
             .Select(path => TryReadPending(path, settings, now))
             .Where(item => item is not null)
             .Select(item => item!)
+            .Where(item => !item.UploadedToNas)
             .OrderBy(item => item.ExpiresAt)
             .ToArray();
+    }
+
+    public NasHealthStatus GetNasHealth()
+    {
+        var settings = GetSettings();
+        var pending = new List<PendingEvidenceCacheItem>();
+        var retained = 0;
+        var expiringSoon = 0;
+        DateTimeOffset? nextExpiration = null;
+        var now = DateTimeOffset.Now;
+
+        if (Directory.Exists(settings.LocalCachePath))
+        {
+            foreach (var path in EnumerateEvidenceFiles(settings.LocalCachePath))
+            {
+                var item = TryReadPending(path, settings, now);
+                if (item is null) continue;
+                retained++;
+                if (item.UploadedToNas)
+                {
+                    if (item.WarningDue) expiringSoon++;
+                    nextExpiration = nextExpiration is null || item.ExpiresAt < nextExpiration ? item.ExpiresAt : nextExpiration;
+                }
+                else
+                {
+                    pending.Add(item);
+                }
+            }
+        }
+
+        var enabled = settings.AllowNasMirror && settings.StorageMode.Equals(StorageNasOnlyWithCache, StringComparison.OrdinalIgnoreCase);
+        var configured = !string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath);
+        var connected = false;
+        string? lastError = null;
+        if (enabled && configured)
+        {
+            connected = ProbeNas(settings.ArchiveMirrorPath!, out lastError);
+        }
+        else if (!configured)
+        {
+            lastError = "NAS archive path is not configured.";
+        }
+        else if (!enabled)
+        {
+            lastError = "NAS repository mode is not enabled.";
+        }
+
+        var state = !connected ? "error" : expiringSoon > 0 ? "warning" : "healthy";
+        return new NasHealthStatus(
+            enabled,
+            configured,
+            connected,
+            state,
+            settings.ArchiveMirrorPath,
+            retained,
+            pending.Count,
+            expiringSoon,
+            nextExpiration,
+            lastError,
+            pending.OrderBy(item => item.CreatedAt).Take(20).ToArray());
     }
 
     public EvidenceSyncResult SyncPendingCache()
@@ -251,10 +320,15 @@ public sealed class EvidenceStore
                     continue;
                 }
 
-                if (record.CreatedAt.AddHours(settings.CacheExpirationHours) <= now)
+                var mirrored = TryFindMirrorPath(record.EvidenceId, settings) is not null;
+                if (mirrored && CacheExpiresAt(path, settings) <= now)
                 {
                     TryDelete(path);
                     deleted++;
+                    continue;
+                }
+                if (mirrored)
+                {
                     continue;
                 }
 
@@ -267,7 +341,7 @@ public sealed class EvidenceStore
                     continue;
                 }
 
-                TryDelete(path);
+                TouchCacheRetentionClock(path);
                 uploaded++;
             }
             catch (Exception ex)
@@ -346,24 +420,30 @@ public sealed class EvidenceStore
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JackPeek Evidence {{Html(record.EvidenceId)}}</title>
   <style>
-    body { font-family: "Cascadia Code", "Cascadia Mono", Consolas, monospace; color: #172027; font-size: 12px; margin: 28px; }
-    h1 { font-size: 24px; margin-bottom: 4px; }
-    h2 { font-size: 16px; margin-top: 22px; }
-    .muted { color: #63717f; font-size: 12px; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 22px 0; }
-    .box { border: 1px solid #d7e0e8; border-radius: 8px; padding: 12px; }
-    .box span { color: #63717f; display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-    .box strong { display: block; font-size: 12px; margin-top: 4px; overflow-wrap: anywhere; }
-    table { border-collapse: collapse; width: 100%; margin-top: 18px; }
-    th, td { border-bottom: 1px solid #d7e0e8; padding: 8px; text-align: left; vertical-align: top; }
-    th { font-size: 10px; text-transform: uppercase; color: #63717f; }
-    pre { background: #152229; border: 1px solid #263942; border-radius: 6px; color: #e7f0f2; padding: 12px; white-space: pre-wrap; }
+    * { box-sizing: border-box; font-family: Arial, "Helvetica Neue", "Segoe UI", system-ui, sans-serif; scrollbar-width: none; }
+    *::-webkit-scrollbar { display: none; }
+    body { color: #182333; background: #fff; font-size: 14px; line-height: 1.5; margin: 32px auto; padding: 0 24px; max-width: 1120px; }
+    h1 { font-size: 30px; letter-spacing: -.6px; margin-bottom: 8px; }
+    h2 { font-size: 20px; margin-top: 24px; }
+    .muted { color: #596575; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 24px 0; }
+    .box { border-bottom: 1px solid #e4e8ed; padding: 12px 0; }
+    .box span { color: #596575; display: block; font-size: 12px; }
+    .box strong { display: block; font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border-bottom: 1px solid #e4e8ed; padding: 12px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    th { font-size: 12px; font-weight: 600; color: #596575; background: #f8f9fb; }
+    pre { background: #f8f9fb; border: 1px solid #e4e8ed; border-radius: 10px; color: #182333; padding: 24px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+    summary { cursor: pointer; color: #0067ce; padding: 16px 0; font-weight: 600; }
+    footer { border-top: 1px solid #e4e8ed; padding-top: 16px; margin-top: 24px; }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } th, td { padding: 6px; font-size: 11px; } }
   </style>
 </head>
 <body>
-  <h1>JackPeek Evidence Report</h1>
+  <h1>JackPeek evidence report</h1>
   <p class="muted">Passive LLDP/CDP capture. No switch login, SNMP, ping sweep, port scan, or probing was performed.</p>
   <div class="grid">
     <div class="box"><span>Evidence ID</span><strong>{{Html(record.EvidenceId)}}</strong></div>
@@ -378,13 +458,13 @@ public sealed class EvidenceStore
     <div class="box"><span>Nearest device</span><strong>{{Html(latest?.DeviceName ?? latest?.ChassisId ?? "Not observed")}}</strong></div>
     <div class="box"><span>Switch port</span><strong>{{Html(latest?.PortDescription ?? latest?.PortId ?? "Not observed")}}</strong></div>
   </div>
-  <h2>Observed Neighbors</h2>
+  <h2>Switch observations</h2>
   <table>
     <thead><tr><th>Protocol</th><th>Device</th><th>Port</th><th>Native VLAN</th><th>Voice VLAN</th><th>Frames</th></tr></thead>
     <tbody>{{string.Join(Environment.NewLine, rows)}}</tbody>
   </table>
-  <h2>Raw Evidence</h2>
-  <pre>{{Html(JsonSerializer.Serialize(record, JsonOptions))}}</pre>
+  <details><summary>View full evidence</summary><pre>{{Html(JsonSerializer.Serialize(record, JsonOptions))}}</pre></details>
+  <footer class="muted">JackPeek 1.0 · Designed by SysSummit</footer>
 </body>
 </html>
 """;
@@ -439,10 +519,11 @@ public sealed class EvidenceStore
                 return null;
             }
 
-            var expiresAt = record.CreatedAt.AddHours(settings.CacheExpirationHours);
-            var hoursUntilExpiration = Math.Max(0, (int)Math.Ceiling((expiresAt - now).TotalHours));
-            var warningDue = settings.CacheWarningHours.Any(hour => hoursUntilExpiration <= hour);
-            return new PendingEvidenceCacheItem(record.EvidenceId, record.CreatedAt, expiresAt, hoursUntilExpiration, warningDue, path, record.Sha256);
+            var uploadedToNas = TryFindMirrorPath(record.EvidenceId, settings) is not null;
+            var expiresAt = uploadedToNas ? CacheExpiresAt(path, settings) : DateTimeOffset.MaxValue;
+            var hoursUntilExpiration = uploadedToNas ? Math.Max(0, (int)Math.Ceiling((expiresAt - now).TotalHours)) : int.MaxValue;
+            var warningDue = uploadedToNas && settings.CacheWarningHours.Any(hour => hoursUntilExpiration <= hour);
+            return new PendingEvidenceCacheItem(record.EvidenceId, record.CreatedAt, expiresAt, hoursUntilExpiration, warningDue, path, record.Sha256, uploadedToNas);
         }
         catch
         {
@@ -510,6 +591,64 @@ public sealed class EvidenceStore
         }
     }
 
+    private static DateTimeOffset CacheExpiresAt(string path, EvidenceSettings settings)
+    {
+        var uploadedAt = File.Exists(path)
+            ? new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero)
+            : DateTimeOffset.UtcNow;
+        return uploadedAt.AddHours(settings.CacheExpirationHours);
+    }
+
+    private static void TouchCacheRetentionClock(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.SetLastWriteTimeUtc(path, DateTimeOffset.UtcNow.UtcDateTime);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private string? TryFindMirrorPath(string evidenceId, EvidenceSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath) || !Directory.Exists(settings.ArchiveMirrorPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return EnumerateEvidenceFiles(settings.ArchiveMirrorPath)
+                .FirstOrDefault(path => Path.GetFileName(path).Contains(evidenceId, StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool ProbeNas(string archivePath, out string? error)
+    {
+        error = null;
+        try
+        {
+            Directory.CreateDirectory(archivePath);
+            var probePath = Path.Combine(archivePath, $".jackpeek-health-{Guid.NewGuid():n}.tmp");
+            File.WriteAllText(probePath, DateTimeOffset.UtcNow.ToString("O"));
+            File.Delete(probePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.GetType().Name;
+            return false;
+        }
+    }
+
     private EvidenceSettings Normalize(EvidenceSettings settings)
     {
         var localPath = string.IsNullOrWhiteSpace(settings.LocalHistoryPath)
@@ -550,8 +689,8 @@ public sealed class EvidenceStore
             AllowedExportFormats = settings.AllowedExportFormats is { Count: > 0 } ? settings.AllowedExportFormats : DefaultExportFormats(),
             StorageMode = storageMode,
             LocalCachePath = cachePath,
-            CacheExpirationHours = Math.Clamp(settings.CacheExpirationHours == 0 ? 24 : settings.CacheExpirationHours, 1, 168),
-            CacheWarningHours = settings.CacheWarningHours is { Count: > 0 } ? settings.CacheWarningHours.Where(hour => hour > 0).Distinct().OrderDescending().ToArray() : [3, 2],
+            CacheExpirationHours = Math.Clamp(settings.CacheExpirationHours == 0 ? SyncedCacheRetentionHours : settings.CacheExpirationHours, 1, SyncedCacheRetentionHours),
+            CacheWarningHours = settings.CacheWarningHours is { Count: > 0 } ? settings.CacheWarningHours.Where(hour => hour > 0).Distinct().OrderDescending().ToArray() : [24, 12],
             NasSyncIntervalMinutes = Math.Clamp(settings.NasSyncIntervalMinutes == 0 ? 60 : settings.NasSyncIntervalMinutes, 5, 1440),
             AdminManagedCacheEncryption = settings.AdminManagedCacheEncryption
         };
@@ -570,10 +709,10 @@ public sealed class EvidenceStore
         false,
         true,
         DefaultExportFormats(),
-        StorageLocalAndNasMirror,
+        StorageNasOnlyWithCache,
         DefaultCachePath(),
-        24,
-        [3, 2],
+        SyncedCacheRetentionHours,
+        [24, 12],
         60,
         true);
 
