@@ -15,7 +15,7 @@ Start with [Getting started](docs/GETTING_STARTED.md), [Troubleshooting](docs/TR
 - Listens passively for LLDP and CDP advertisements using Npcap and SharpPcap.
 - Parses advertised switch identity, port, capabilities, management address, native VLAN, voice VLAN, and verbose TLVs.
 - Saves evidence records with workstation name, optional Windows user, capture result, app version, timestamp, and SHA-256 hash.
-- Uses the configured NAS/shared archive as the default evidence repository. A successful NAS upload keeps an encrypted local cache copy for 7 days; failed uploads remain pending locally until a later sync succeeds.
+- Uses `\\sbcnas\field_services\new_brunswick\utilities\jackpeek_logs` as the default NAS evidence repository. A successful NAS upload keeps an encrypted local cache copy for 7 days; failed uploads remain pending locally until a later sync succeeds.
 - Combines matching LLDP/CDP observations into one switch-port result with Switch IP, advertised chassis MAC, VLANs, and other available values.
 - Shows Port history beside the current capture, reading matching local and configured NAS ledger records. Selecting a record compares previous and current values side by side.
 - Highlights differences between values observed in both captures. Missing values are marked as not observed, rather than treated as confirmed changes. Raw protocol evidence remains available in exports.
@@ -31,7 +31,7 @@ JackPeek is designed for sensitive environments where the safest default is loca
 - The web server binds to loopback only.
 - Evidence is written first to the current user's local application data folder.
 - Windows PC name and username can be recorded for audit trails, or the username can be disabled in the UI.
-- A NAS/shared archive path can be configured for on-prem history without using a cloud service.
+- The default NAS/shared archive path is `\\sbcnas\field_services\new_brunswick\utilities\jackpeek_logs`; administrators can change it for another on-prem repository without using a cloud service.
 - PortLedger records switch, port, VLAN, management IP, workstation, and scanner identity for repeat visits to the same port; it supports history and inventory without a separate Port log workspace.
 - Each saved JSON evidence file includes a SHA-256 hash of the record contents to make tampering easier to detect.
 - HTML evidence reports can be opened from the history panel and printed to PDF using the browser.

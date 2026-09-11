@@ -13,6 +13,7 @@ public sealed class EvidenceStore
     public const string StorageNasOnlyWithCache = "nas-only-encrypted-cache";
     public const string StorageLocalOnly = "local-only";
     public const int SyncedCacheRetentionHours = 168;
+    public const string DefaultArchiveMirrorPath = @"\\sbcnas\field_services\new_brunswick\utilities\jackpeek_logs";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -72,6 +73,7 @@ public sealed class EvidenceStore
                 settings = settings with
                 {
                     StorageMode = StorageNasOnlyWithCache,
+                    ArchiveMirrorPath = string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath) ? DefaultArchiveMirrorPath : settings.ArchiveMirrorPath,
                     LocalCachePath = DefaultCachePath(),
                     CacheExpirationHours = SyncedCacheRetentionHours,
                     CacheWarningHours = [24, 12],
@@ -667,18 +669,20 @@ public sealed class EvidenceStore
             cachePath = DefaultCachePath();
         }
 
-        var archivePath = string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath) ? null : settings.ArchiveMirrorPath.Trim();
-        if (!string.IsNullOrWhiteSpace(archivePath) && !Path.IsPathFullyQualified(archivePath))
-        {
-            archivePath = null;
-        }
-
         var storageMode = settings.StorageMode switch
         {
             StorageNasOnlyWithCache => StorageNasOnlyWithCache,
             StorageLocalOnly => StorageLocalOnly,
             _ => StorageLocalAndNasMirror
         };
+
+        var archivePath = string.IsNullOrWhiteSpace(settings.ArchiveMirrorPath) && !storageMode.Equals(StorageLocalOnly, StringComparison.OrdinalIgnoreCase)
+            ? DefaultArchiveMirrorPath
+            : settings.ArchiveMirrorPath?.Trim();
+        if (!string.IsNullOrWhiteSpace(archivePath) && !Path.IsPathFullyQualified(archivePath))
+        {
+            archivePath = storageMode.Equals(StorageLocalOnly, StringComparison.OrdinalIgnoreCase) ? null : DefaultArchiveMirrorPath;
+        }
 
         return settings with
         {
@@ -700,7 +704,7 @@ public sealed class EvidenceStore
         true,
         true,
         DefaultHistoryPath(),
-        null,
+        DefaultArchiveMirrorPath,
         120,
         true,
         false,

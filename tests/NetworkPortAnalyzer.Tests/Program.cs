@@ -22,6 +22,7 @@ var tests = new (string Name, Action Test)[]
     ("omits unknown LLDP and CDP payloads", Tests.UnknownTlvs),
     ("admin setup persists without an embedded credential", Tests.AdminCredentials),
     ("redacts credential-bearing audit details", Tests.AuditRedaction),
+    ("uses the field services NAS repository by default", Tests.DefaultNasRepositoryPath),
     ("NAS-only does not create a plaintext local ledger", Tests.NasLedgerPrivacy),
     ("NAS-primary evidence keeps seven-day local cache after upload", Tests.NasPrimaryCacheRetention),
     ("pending NAS evidence is retained until upload succeeds", Tests.PendingNasCacheRetained),
@@ -90,6 +91,20 @@ internal static class Tests
         Assert(AuditLog.Redact("Authorization: Bearer example") == "Authorization=[REDACTED]", "authorization redacted");
         Assert(AuditLog.Redact(new string('x', 5000))!.Length == 2048, "bounded detail");
         Assert(AuditLog.Redact(null) is null, "null is preserved");
+    }
+
+    public static void DefaultNasRepositoryPath()
+    {
+        var root = TempRoot();
+        try
+        {
+            var store = new EvidenceStore(new WindowsIdentityService(), Path.Combine(root, "settings"));
+            var settings = store.GetSettings();
+            Assert(settings.StorageMode == EvidenceStore.StorageNasOnlyWithCache, "NAS-primary mode remains the default storage mode");
+            Assert(settings.ArchiveMirrorPath == EvidenceStore.DefaultArchiveMirrorPath, "field services NAS share is the default archive path");
+            Assert(settings.LocalCachePath.EndsWith(Path.Combine("JackPeek", "PendingCache"), StringComparison.OrdinalIgnoreCase), "encrypted local cache remains configured");
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     public static void NasLedgerPrivacy()
