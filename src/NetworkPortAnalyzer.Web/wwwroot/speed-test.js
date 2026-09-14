@@ -3,10 +3,35 @@
 
 (function (root) {
   const ENDPOINT = "https://speed.cloudflare.com";
+  const DEFAULT_DURATION = 30000;
+  const LATENCY_FRACTION = 0.16;
+  const DOWNLOAD_FRACTION = 0.42;
   // Smaller independent samples work on connections that reject large bodies.
-  // The two directions together request 39.5 MB of test payload at most.
-  const DOWNLOAD_BYTES = [1000000, 4000000, 4000000, 4000000, 4000000, 4000000];
-  const UPLOAD_BYTES = [500000, 2000000, 4000000, 4000000, 4000000, 4000000];
+  // Repeating them across the run window gives steadier readings without one large request.
+  const DOWNLOAD_BYTES = [1000000, 4000000, 4000000, 4000000];
+  const UPLOAD_BYTES = [500000, 2000000, 4000000, 4000000];
+  const sleep = (ms, signal) =>
+    new Promise((resolve, reject) => {
+      if (ms <= 0) {
+        resolve();
+        return;
+      }
+      if (signal.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      const timer = setTimeout(done, ms);
+      function done() {
+        signal.removeEventListener("abort", abort);
+        resolve();
+      }
+      function abort() {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+        reject(signal.reason);
+      }
+      signal.addEventListener("abort", abort, { once: true });
+    });
   const median = (values) => {
     const sorted = [...values].sort((a, b) => a - b);
     const middle = Math.floor(sorted.length / 2);
@@ -23,7 +48,10 @@
         options.random || ((bytes) => root.crypto.getRandomValues(bytes));
       this.onUpdate = options.onUpdate || (() => {});
       this.requestTimeout = options.requestTimeout ?? 8000;
-      this.runTimeout = options.runTimeout ?? 45000;
+      this.duration = options.duration ?? DEFAULT_DURATION;
+      this.sampleInterval = options.sampleInterval ?? 900;
+      this.runTimeout = options.runTimeout ?? this.duration + 10000;
+      this.wait = options.wait || sleep;
       this.controller = null;
       this.sequence = 0;
       this.result = this.initial();
@@ -42,7 +70,8 @@
         payloadBytes: 0,
         samples: [],
         completedAt: null,
-        detail: "Runs automatically after sign-in. You can cancel at any time.",
+        detail:
+          "Runs automatically after sign-in for 30 seconds. You can cancel at any time.",
       };
     }
 
@@ -142,11 +171,28 @@
       }
     }
 
-    async measureDirection(direction) {
+    progressFromTime(startedAt) {
+      if (!startedAt) return 0;
+      const elapsed = Math.max(0, this.now() - startedAt);
+      return Math.min(99, (elapsed / this.duration) * 100);
+    }
+
+    async paceUntil(nextSampleAt, deadline, startedAt) {
+      const now = this.now();
+      const waitMs = Math.min(nextSampleAt, deadline) - now;
+      if (waitMs > 0) {
+        await this.wait(waitMs, this.controller.signal);
+        this.emit({ progress: this.progressFromTime(startedAt) });
+      }
+    }
+
+    async measureDirection(direction, deadline, startedAt) {
       const sizes = direction === "download" ? DOWNLOAD_BYTES : UPLOAD_BYTES;
       const samples = [];
-      for (let i = 0; i < sizes.length; i++) {
-        const bytes = sizes[i];
+      let i = 0;
+      do {
+        const bytes = sizes[i % sizes.length];
+        const sampleStarted = this.now();
         let transfer;
         if (direction === "download") {
           transfer = await this.exchange(`/__down?bytes=${bytes}`, {
@@ -182,7 +228,7 @@
           direction,
           mbps: Math.max(0, estimate),
           sample: i + 1,
-          total: sizes.length,
+          total: null,
         };
         this.emit({
           [direction]: estimate,
@@ -190,11 +236,15 @@
           currentMbps: visualSample.mbps,
           samples: [...this.result.samples, visualSample],
           payloadBytes: this.result.payloadBytes + bytes,
-          progress:
-            (direction === "download" ? 20 : 58) +
-            ((i + 1) / sizes.length) * 38,
+          progress: this.progressFromTime(startedAt),
         });
-      }
+        i += 1;
+        await this.paceUntil(
+          sampleStarted + this.sampleInterval,
+          deadline,
+          startedAt,
+        );
+      } while (this.now() < deadline && !this.controller.signal.aborted);
     }
 
     async run() {
@@ -207,11 +257,16 @@
           ),
         this.runTimeout,
       );
+      const startedAt = this.now();
+      const latencyDeadline = startedAt + this.duration * LATENCY_FRACTION;
+      const downloadDeadline =
+        latencyDeadline + this.duration * DOWNLOAD_FRACTION;
+      const uploadDeadline = startedAt + this.duration;
       this.result = this.initial();
       this.emit({
         running: true,
         phase: "latency",
-        detail: "Connecting to Cloudflare and measuring HTTPS latency…",
+        detail: "Starting 30-second speed test and measuring HTTPS latency...",
       });
       try {
         // Edge discovery is optional. Keep only the edge code, never the returned IP.
@@ -228,9 +283,18 @@
         await this.exchange("/__down?bytes=0"); // Warm connection before measured latency.
         const latency = [];
         for (let i = 0; i < 6; i++) {
+          const sampleStarted = this.now();
           const sample = await this.exchange("/__down?bytes=0");
           latency.push(sample.latency);
-          this.emit({ ping: median(latency), progress: ((i + 1) / 6) * 20 });
+          this.emit({
+            ping: median(latency),
+            progress: this.progressFromTime(startedAt),
+          });
+          await this.paceUntil(
+            sampleStarted + this.sampleInterval,
+            latencyDeadline,
+            startedAt,
+          );
         }
         const deltas = latency
           .slice(1)
@@ -238,12 +302,16 @@
         this.emit({
           jitter: deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length,
           phase: "download",
-          detail: "Measuring download throughput…",
+          detail: "Measuring download throughput across the 30-second window...",
         });
         const failures = [];
         const direction = async (name) => {
           try {
-            await this.measureDirection(name);
+            await this.measureDirection(
+              name,
+              name === "download" ? downloadDeadline : uploadDeadline,
+              startedAt,
+            );
           } catch (error) {
             if (this.controller.signal.aborted) throw error;
             failures.push(
@@ -254,8 +322,8 @@
         await direction("download");
         this.emit({
           phase: "upload",
-          progress: 58,
-          detail: "Measuring upload throughput…",
+          progress: this.progressFromTime(startedAt),
+          detail: "Measuring upload throughput across the 30-second window...",
         });
         await direction("upload");
         if (failures.length) {

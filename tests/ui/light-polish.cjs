@@ -35,6 +35,7 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
     let body;
     if (url.pathname.startsWith('/api/')) {
       if (url.pathname === '/api/session') body = { settings, license: { isValid: false, state: 'Not installed' }, admin: { isConfigured: true, isUnlocked: admin }, access: { isApproved: approved, account: 'DEMO\\reviewer', requiresProfile: false }, workstation: { machineName: 'DEMO-WORKSTATION', userName: 'Demo reviewer' } };
+      else if (url.pathname === '/api/update/status') body = { state: 'current', currentVersion: '1.0', availableVersion: '1.0', releaseDate: '2026-09-12', changes: [], message: 'JackPeek is up to date.' };
       else if (url.pathname === '/api/access/login') body = { isApproved: approved, requiresProfile: false };
       else if (url.pathname === '/api/adapters') body = [{ id: 'demo-wired', name: 'DEMO Ethernet', description: 'DEMO Ethernet', operationalStatus: 'Up', captureAvailable: driver, macAddress: '02:00:00:00:00:02', ipAddresses: ['192.0.2.20', '2001:db8:1234:5678:1234:5678:abcd:1234'] }, { id: 'demo-usb', name: 'DEMO USB Ethernet', description: 'DEMO USB Gigabit adapter', operationalStatus: 'Down', captureAvailable: true, ipAddresses: [] }];
       else if (url.pathname.endsWith('/traffic')) body = { capturedAt: new Date().toISOString(), bytesReceived: 1000000, bytesSent: 500000 };
@@ -89,9 +90,10 @@ const settings = { secureMode: true, includeWindowsUser: true, localHistoryPath:
     assert.equal(await page.locator('#liveTrafficPanel').count(), 0, 'Traffic counters do not replace speed test');
     await page.locator('#speedTestPanel[data-phase="error"]').waitFor();
     assert(speedRequests > 0, 'Test starts automatically after sign-in');
-    assert.equal(await page.locator('#speedUpload').textContent(), '–', 'Missing upload is not zero');
+    assert.equal(await page.locator('#speedUploadGauge').textContent(), '–', 'Missing upload is not zero');
     assert.equal(await page.locator('#speedTestTitle').textContent(), 'Speed Test');
-    assert.equal(await page.locator('#speedChart').count(), 1, 'Speed Test includes a live graph surface');
+    assert.equal(await page.locator('.gauge-canvas').count(), 2, 'Speed Test includes separate throughput gauges');
+    assert.equal(await page.locator('#speedPing').count(), 1, 'Latency is shown once');
     await page.locator('#adapterMenuButton').click();
     await shot('adapter-dropdown');
     await page.keyboard.press('Escape');

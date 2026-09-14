@@ -122,6 +122,8 @@ const state = {
   adminReviewFilter: "all",
   nasHealth: null,
   nasHealthOpen: false,
+  updateStatus: null,
+  updatePromptShown: false,
 };
 const tabs = [...document.querySelectorAll(".tabs [role='tab']")];
 const iconMarkup = (name) =>
@@ -369,57 +371,204 @@ function npcapNotice() {
   $("captureNotice").append(link);
 }
 
-function renderSpeedChart(result) {
-  const samples = Array.isArray(result.samples) ? result.samples : [];
-  const latest =
-    Number.isFinite(result.currentMbps) && result.running
-      ? result.currentMbps
-      : Number.isFinite(result.upload)
-        ? result.upload
-        : Number.isFinite(result.download)
-          ? result.download
-          : null;
-  $("speedGaugeValue").textContent = Number.isFinite(latest)
-    ? latest.toFixed(latest >= 100 ? 0 : 1)
-    : "–";
-  $("speedGaugeLabel").textContent =
-    result.currentDirection === "upload"
-      ? "upload Mbps"
-      : result.currentDirection === "download"
-        ? "download Mbps"
-        : "Mbps";
-  if (!samples.length) {
-    $("speedChartPath").setAttribute("d", "");
-    $("speedChartPeak").textContent = "Waiting";
-    return;
+const gaugeVisuals = {
+  download: { percent: 0, quality: "idle", frame: 0 },
+  upload: { percent: 0, quality: "idle", frame: 0 },
+};
+
+function scaleGaugeValue(value, direction) {
+  const values = direction === "upload" ? [0, 10, 50, 200] : [0, 25, 100, 500];
+  const positions = [0, 0.34, 0.68, 1];
+  const safeValue = Math.max(0, value);
+  for (let index = 1; index < values.length; index += 1) {
+    if (safeValue <= values[index]) {
+      const range = values[index] - values[index - 1];
+      const ratio = range ? (safeValue - values[index - 1]) / range : 0;
+      return positions[index - 1] + ratio * (positions[index] - positions[index - 1]);
+    }
   }
-  const peak = Math.max(1, ...samples.map((sample) => sample.mbps || 0));
-  const width = 360;
-  const height = 120;
-  const last = Math.max(1, samples.length - 1);
-  const path = samples
-    .map((sample, index) => {
-      const x = (index / last) * width;
-      const y =
-        height -
-        Math.min(1, (sample.mbps || 0) / peak) * (height - 12) -
-        6;
-      return `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(" ");
-  $("speedChartPath").setAttribute("d", path);
-  $("speedChartPeak").textContent = `${peak.toFixed(peak >= 100 ? 0 : 1)} Mbps peak`;
+  return 1;
+}
+
+function speedQuality(value, direction) {
+  if (!Number.isFinite(value)) return { key: "idle", label: "Waiting", percent: 0 };
+  const high = direction === "upload" ? 50 : 100;
+  const medium = direction === "upload" ? 10 : 25;
+  const key = value >= high ? "high" : value >= medium ? "medium" : "low";
+  const label = key === "high" ? "High" : key === "medium" ? "Medium" : "Low";
+  return { key, label, percent: scaleGaugeValue(value, direction) };
+}
+
+function pingQuality(value) {
+  if (!Number.isFinite(value)) return { key: "idle", label: "Waiting" };
+  if (value <= 30) return { key: "high", label: "Low latency" };
+  if (value <= 80) return { key: "medium", label: "Medium" };
+  return { key: "low", label: "High latency" };
+}
+
+function drawGaugeCanvas(kind, percent, qualityKey) {
+  const canvas = $(`${kind}GaugeCanvas`);
+  const bounds = canvas.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
+
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = bounds.width;
+  const height = bounds.height;
+  const targetWidth = Math.round(width * pixelRatio);
+  const targetHeight = Math.round(height * pixelRatio);
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+  }
+
+  const context = canvas.getContext("2d");
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const centerX = width / 2;
+  const centerY = height * 0.88;
+  const radius = Math.min(width * 0.42, height * 0.74);
+  const startAngle = Math.PI;
+  const sweep = Math.PI;
+  const endAngle = startAngle + sweep * Math.max(0, Math.min(1, percent));
+  const lineWidth = Math.max(12, Math.min(18, width * 0.052));
+  const palette = {
+    idle: ["rgba(126, 146, 166, 0.28)", "#7e92a6"],
+    low: ["rgba(213, 73, 67, 0.26)", "#d54943"],
+    medium: ["rgba(221, 135, 15, 0.28)", "#dd870f"],
+    high: ["rgba(10, 147, 101, 0.26)", "#0a9365"],
+  };
+  const colors = palette[qualityKey] || palette.idle;
+
+  context.lineCap = "round";
+  context.lineWidth = lineWidth;
+  context.strokeStyle = "#e4ebf2";
+  context.beginPath();
+  context.arc(centerX, centerY, radius, startAngle, startAngle + sweep);
+  context.stroke();
+
+  if (percent > 0.002) {
+    const fill = context.createLinearGradient(
+      centerX - radius,
+      centerY,
+      centerX + radius,
+      centerY,
+    );
+    fill.addColorStop(0, colors[0]);
+    fill.addColorStop(0.7, colors[1]);
+    fill.addColorStop(1, colors[1]);
+    context.strokeStyle = fill;
+    context.shadowColor = colors[0];
+    context.shadowBlur = 12;
+    context.beginPath();
+    context.arc(centerX, centerY, radius, startAngle, endAngle);
+    context.stroke();
+    context.shadowBlur = 0;
+  }
+
+  for (let index = 0; index <= 20; index += 1) {
+    const angle = startAngle + sweep * (index / 20);
+    const major = index % 5 === 0;
+    const outer = radius + lineWidth / 2 + 7;
+    const inner = outer - (major ? 9 : 5);
+    context.lineWidth = major ? 1.5 : 1;
+    context.strokeStyle = major ? "#72869a" : "#b8c6d4";
+    context.beginPath();
+    context.moveTo(centerX + Math.cos(angle) * inner, centerY + Math.sin(angle) * inner);
+    context.lineTo(centerX + Math.cos(angle) * outer, centerY + Math.sin(angle) * outer);
+    context.stroke();
+  }
+
+  const needleAngle = startAngle + sweep * Math.max(0, Math.min(1, percent));
+  context.save();
+  context.translate(centerX, centerY);
+  context.rotate(needleAngle);
+  context.lineWidth = 3;
+  context.lineCap = "round";
+  context.strokeStyle = "#102c47";
+  context.shadowColor = "rgba(16, 44, 71, 0.22)";
+  context.shadowBlur = 6;
+  context.beginPath();
+  context.moveTo(-6, 0);
+  context.lineTo(radius * 0.73, 0);
+  context.stroke();
+  context.restore();
+
+  context.shadowBlur = 0;
+  context.fillStyle = "#ffffff";
+  context.beginPath();
+  context.arc(centerX, centerY, 8, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#102c47";
+  context.beginPath();
+  context.arc(centerX, centerY, 4.5, 0, Math.PI * 2);
+  context.fill();
+}
+
+function animateGauge(kind, targetPercent, qualityKey, active) {
+  const visual = gaugeVisuals[kind];
+  cancelAnimationFrame(visual.frame);
+  const startPercent = visual.percent;
+  const startedAt = performance.now();
+  const duration = active ? 180 : 320;
+  visual.quality = qualityKey;
+
+  const frame = (now) => {
+    const elapsed = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - elapsed, 3);
+    visual.percent = startPercent + (targetPercent - startPercent) * eased;
+    drawGaugeCanvas(kind, visual.percent, visual.quality);
+    if (elapsed < 1) visual.frame = requestAnimationFrame(frame);
+  };
+  visual.frame = requestAnimationFrame(frame);
+}
+
+function renderSpeedometer(kind, value, active) {
+  const quality = speedQuality(value, kind);
+  const card = $(`${kind}GaugeCard`);
+  const label = $(`${kind}Quality`);
+  const display = $(`speed${kind[0].toUpperCase()}${kind.slice(1)}Gauge`);
+  const canvas = $(`${kind}GaugeCanvas`);
+  card.dataset.quality = active ? "active" : quality.key;
+  label.textContent = active ? "Testing" : quality.label;
+  display.textContent = Number.isFinite(value)
+    ? value.toFixed(value >= 100 ? 0 : 1)
+    : "–";
+  canvas.setAttribute(
+    "aria-label",
+    Number.isFinite(value)
+      ? `${kind === "download" ? "Download" : "Upload"} speed ${display.textContent} megabits per second. ${active ? "Test in progress" : `${quality.label} result`}.`
+      : `${kind === "download" ? "Download" : "Upload"} speed has not been measured`,
+  );
+  animateGauge(kind, quality.percent, quality.key, active);
+}
+
+function renderPingRoute(value, active) {
+  const quality = pingQuality(value);
+  $("pingLinkCard").dataset.quality = active ? "active" : quality.key;
+  $("pingQuality").textContent = active ? "Testing" : quality.label;
+  $("speedPing").textContent = Number.isFinite(value)
+    ? value.toFixed(value >= 100 ? 0 : 1)
+    : "–";
 }
 
 function renderSpeedTest(result) {
   const number = (value) =>
     Number.isFinite(value) ? value.toFixed(value >= 100 ? 0 : 1) : "–";
-  $("speedDownload").textContent = number(result.download);
-  $("speedUpload").textContent = number(result.upload);
-  $("speedPing").textContent = number(result.ping);
   $("speedJitter").textContent = number(result.jitter);
   $("speedEdge").textContent = result.edge || "Not available";
-  renderSpeedChart(result);
+  const liveValue = Number.isFinite(result.currentMbps) ? result.currentMbps : null;
+  renderSpeedometer(
+    "download",
+    result.currentDirection === "download" && result.running ? liveValue : result.download,
+    result.currentDirection === "download" && result.running,
+  );
+  renderSpeedometer(
+    "upload",
+    result.currentDirection === "upload" && result.running ? liveValue : result.upload,
+    result.currentDirection === "upload" && result.running,
+  );
+  renderPingRoute(result.ping, result.phase === "latency" && result.running);
   const label = {
     idle: "Ready",
     latency: "Measuring latency",
@@ -450,6 +599,21 @@ function renderSpeedTest(result) {
   $("speedTestStartBtn").innerHTML =
     `${iconMarkup(result.phase === "idle" ? "play" : "arrow-path")}<span>${result.phase === "idle" ? "Run speed test" : "Run again"}</span>`;
   $("speedTestCancelBtn").hidden = !result.running;
+  renderSpeedTestNotice(result);
+}
+
+function renderSpeedTestNotice(result) {
+  const notice = $("speedTestNotice");
+  notice.hidden = !state.signedIn || !result.running;
+  if (!result.running) return;
+  const phase =
+    {
+      latency: "Measuring latency",
+      download: "Testing download",
+      upload: "Testing upload",
+    }[result.phase] || "Checking connection";
+  $("speedTestNoticeDetail").textContent =
+    `${phase} - ${Math.max(0, Math.min(99, Math.round(result.progress || 0)))}%`;
 }
 
 function startSpeedTest(manual = false) {
@@ -464,6 +628,112 @@ function startSpeedTest(manual = false) {
 
 function stopSpeedTest() {
   state.speedTest.engine?.cancel();
+}
+
+function jumpToSpeedTest() {
+  showTab("capture");
+  requestAnimationFrame(() =>
+    $("speedTestPanel").scrollIntoView({ behavior: "smooth", block: "start" }),
+  );
+}
+
+function renderUpdateStatus() {
+  const status = state.updateStatus;
+  const button = $("updateStatusBtn");
+  if (!status) {
+    button.hidden = false;
+    button.textContent = "Checking updates";
+    button.dataset.state = "checking";
+    return;
+  }
+  button.hidden = false;
+  button.dataset.state = status.updateAvailable
+    ? "available"
+    : status.state === "current"
+      ? "current"
+      : "unavailable";
+  button.textContent = status.updateAvailable
+    ? "Pending Update"
+    : status.state === "current"
+      ? "Up to date"
+      : "Update status unavailable";
+}
+
+function renderUpdateDialog() {
+  const status = state.updateStatus || {};
+  $("updateCurrentVersion").textContent = `v${status.currentVersion || "1.0"}`;
+  $("updateLatestVersion").textContent = status.latestVersion
+    ? `v${status.latestVersion}`
+    : "Not available";
+  $("updateReleaseDate").textContent = status.releaseDate || "Not recorded";
+  $("updateSha").textContent = status.sha256 || "Not published";
+  const changes = status.changes?.length
+    ? status.changes
+    : [status.lastError || "No release notes are available."];
+  $("updateChanges").innerHTML = changes
+    .map((change) => `<li>${escapeHtml(change)}</li>`)
+    .join("");
+  $("startUpdateBtn").hidden = !status.updateAvailable;
+  $("updateDialogTitle").textContent = status.updateAvailable
+    ? "JackPeek update available"
+    : status.state === "current"
+      ? "JackPeek is up to date"
+      : "Update status unavailable";
+  $("updateDialogDescription").textContent = status.updateAvailable
+    ? "A newer portable release is available from the NAS repository."
+    : status.state === "current"
+      ? "This workstation is running the current portable release."
+      : "JackPeek could not read the NAS release manifest.";
+}
+
+function showUpdateDialog() {
+  renderUpdateDialog();
+  $("updateDialog").hidden = false;
+  ($("startUpdateBtn").hidden ? $("postponeUpdateBtn") : $("startUpdateBtn")).focus();
+}
+
+function hideUpdateDialog() {
+  $("updateDialog").hidden = true;
+  $("updateDialogStatus").textContent = "";
+  $("updateStatusBtn").focus();
+}
+
+async function loadUpdateStatus() {
+  renderUpdateStatus();
+  try {
+    state.updateStatus = await request("/api/update/status");
+  } catch (error) {
+    state.updateStatus = {
+      state: "unavailable",
+      currentVersion: "1.0",
+      updateAvailable: false,
+      changes: [],
+      lastError: error.message,
+    };
+  }
+  renderUpdateStatus();
+  if (state.updateStatus.updateAvailable && !state.updatePromptShown) {
+    state.updatePromptShown = true;
+    showUpdateDialog();
+  }
+}
+
+async function startUpdate() {
+  $("startUpdateBtn").disabled = true;
+  $("startUpdateBtn").setAttribute("aria-busy", "true");
+  $("updateDialogStatus").textContent = "Opening the NAS updater...";
+  try {
+    const result = await post("/api/update/start", {});
+    state.updateStatus = result.status || state.updateStatus;
+    $("updateDialogStatus").textContent = result.message;
+    renderUpdateStatus();
+    renderUpdateDialog();
+  } catch (error) {
+    $("updateDialogStatus").textContent = error.message;
+  } finally {
+    $("startUpdateBtn").disabled = false;
+    $("startUpdateBtn").setAttribute("aria-busy", "false");
+  }
 }
 
 function shouldShowNpcapDialog() {
@@ -2487,6 +2757,14 @@ $("refreshBtn").addEventListener("click", loadAdapters);
 $("adapterSelect").addEventListener("change", updateAdapter);
 $("speedTestStartBtn").addEventListener("click", () => startSpeedTest(true));
 $("speedTestCancelBtn").addEventListener("click", stopSpeedTest);
+$("speedTestNotice").addEventListener("click", jumpToSpeedTest);
+window.addEventListener("resize", () => {
+  drawGaugeCanvas("download", gaugeVisuals.download.percent, gaugeVisuals.download.quality);
+  drawGaugeCanvas("upload", gaugeVisuals.upload.percent, gaugeVisuals.upload.quality);
+});
+$("updateStatusBtn").addEventListener("click", showUpdateDialog);
+$("startUpdateBtn").addEventListener("click", startUpdate);
+$("postponeUpdateBtn").addEventListener("click", hideUpdateDialog);
 window.addEventListener("pagehide", stopSpeedTest);
 $("adapterMenuButton").addEventListener("click", toggleAdapterMenu);
 $("adapterMenu").addEventListener("click", (event) => {
@@ -2648,6 +2926,9 @@ $("npcapCheckBtn").addEventListener("click", () => {
 $("npcapDialog").addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideNpcapDialog();
 });
+$("updateDialog").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideUpdateDialog();
+});
 $("accountDialog").addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideAccountDialog();
 });
@@ -2658,6 +2939,7 @@ $("adminLoginDialog").addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideAdminLoginPage();
 });
 showTab(location.hash.slice(1), false);
+void loadUpdateStatus();
 void loadSession();
 showSettingSection(0);
 document

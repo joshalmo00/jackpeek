@@ -1202,124 +1202,33 @@ progress::-moz-progress-bar {
   color: var(--muted);
   margin-bottom: 12px;
 }
-/* One performance surface. Metrics do not need their own containers. */
+/* Speed Test is one instrument surface with no duplicated results. */
 .speed-test-panel {
   margin-top: 24px;
   padding: 24px;
 }
-.speed-test-heading,
-.speed-test-footer {
+.speed-test-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
 }
-.speed-test-heading h2 {
-  font-size: 20px;
-}
-.speed-test-heading p {
-  font-size: 12px;
-  margin-top: 4px;
-}
-.speed-test-grid {
-  display: grid;
-  grid-template-columns: 1.3fr 1.3fr 0.9fr 0.9fr 0.9fr;
-  gap: 24px;
-  margin: 24px 0;
-}
-.speed-test-stage {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 24px;
-  align-items: center;
-  margin-top: 24px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-}
-.speed-gauge {
-  display: grid;
-  place-items: center;
-}
-.speed-gauge-ring {
-  width: 160px;
-  height: 160px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at center, #fff 0 58%, transparent 59%),
-    conic-gradient(from -90deg, var(--blue) 0deg, #58a6ff 145deg, #ff9f43 230deg, #e7edf5 231deg 360deg);
-  box-shadow: inset 0 0 0 1px #dbe7f5, 0 18px 34px #0b3d6814;
-}
-.speed-gauge-ring span {
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.speed-gauge-ring small {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.speed-chart-wrap {
-  min-width: 0;
-}
-.speed-chart {
-  width: 100%;
-  height: 150px;
-  display: block;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e0e7f0;
-}
-.speed-chart-grid {
-  fill: none;
-  stroke: #e6edf5;
-  stroke-width: 1;
-}
-.speed-chart-line {
-  fill: none;
-  stroke: var(--blue);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 6px 8px #0067ce20);
-  transition: d var(--ease);
-}
-.speed-chart-scale {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.speed-metric {
-  min-width: 0;
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
-}
-.speed-metric:first-child {
-  border: 0;
-  padding-left: 0;
-}
 .speed-test-heading.panel-heading {
   padding: 0;
   border: 0;
 }
-.speed-edge dd {
-  font-size: 22px;
-  font-weight: 700;
+.speed-test-heading h2 {
+  font-size: 20px;
 }
-.speed-metric .metric-value {
-  white-space: nowrap;
+.speed-test-heading p {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.speed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .speed-test-panel.is-running #speedTestState::before {
   content: "";
@@ -1330,70 +1239,344 @@ progress::-moz-progress-bar {
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
-.speed-metric dt {
+.speed-test-notice {
+  position: fixed;
+  z-index: 90;
+  top: 82px;
+  right: 24px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  max-width: min(340px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid #b8d5f5;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: 0 14px 34px #163a5f22;
+  cursor: pointer;
 }
-.speed-metric dt svg {
-  color: var(--blue);
-  width: 16px;
-  height: 16px;
+.speed-test-notice:hover {
+  border-color: #7db5ee;
+  transform: translateY(-1px);
 }
-.speed-metric dd {
+.speed-test-notice strong,
+.speed-test-notice small {
+  display: block;
+  text-align: left;
+}
+.speed-test-notice strong {
+  font-size: 13px;
+}
+.speed-test-notice small {
+  color: #52677e;
+  font-size: 11px;
+}
+.notice-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cfe4fa;
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+.speed-test-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 0.86fr);
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid #d9e4f0;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+.throughput-meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+.throughput-meter,
+.latency-summary {
+  min-width: 0;
+  padding: 20px 24px;
+}
+.throughput-meter + .throughput-meter,
+.latency-summary {
+  border-left: 1px solid #d9e4f0;
+}
+.meter-heading {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.meter-label {
+  color: #415872;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.quality-pill {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #edf2f7;
+  color: #52677e;
+}
+[data-quality="low"] .quality-pill {
+  background: #fde9e8;
+  color: #a8231f;
+}
+[data-quality="medium"] .quality-pill {
+  background: #fff0d7;
+  color: #8c4f00;
+}
+[data-quality="high"] .quality-pill {
+  background: #def4e8;
+  color: #08623e;
+}
+[data-quality="active"] .quality-pill {
+  background: #e1efff;
+  color: #075ea8;
+}
+.gauge-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
   margin-top: 8px;
 }
-.speed-metric .metric-value {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
+.gauge-scale {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: -4px 3% 0;
+  color: #687b90;
+  font-size: 10px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+.gauge-scale span:nth-child(2),
+.gauge-scale span:nth-child(3) {
+  text-align: center;
+}
+.gauge-scale span:last-child {
+  text-align: right;
+}
+.gauge-reading {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  min-height: 45px;
+  margin-top: 6px;
   color: var(--ink);
 }
-.speed-metric-primary .metric-value {
-  color: var(--blue);
-  font-size: 40px;
+.gauge-reading span,
+.latency-reading > span:first-child {
+  font-size: 38px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
 }
-.speed-unit {
+.gauge-reading small,
+.latency-reading small {
+  color: #52677e;
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 400;
-  letter-spacing: 0;
+  font-weight: 600;
 }
-.speed-actions {
+.latency-summary {
+  display: flex;
+  flex-direction: column;
+}
+.latency-reading {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 6px;
+  margin-top: 30px;
+}
+.latency-reading > span:last-child {
+  grid-column: 1 / -1;
+  margin-top: 5px;
+  color: #52677e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.ping-route {
+  display: grid;
+  grid-template-columns: 40px minmax(48px, 1fr) 40px;
+  align-items: center;
+  margin: 22px 0;
+}
+.route-node {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bed4e9;
+  border-radius: 10px;
+  background: #f4f9fe;
+  color: #0569c7;
+}
+.route-node .icon {
+  width: 22px;
+  height: 22px;
+}
+.server-node {
+  color: #07865a;
+}
+.route-line {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background: #cfddeb;
+}
+.route-line i {
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, #086fcf, transparent);
+  animation: routePulse 1.2s ease-in-out infinite;
+}
+[data-quality="low"] .route-line i {
+  background: linear-gradient(90deg, transparent, #d0443e, transparent);
+  animation-duration: 2s;
+}
+[data-quality="medium"] .route-line i {
+  background: linear-gradient(90deg, transparent, #dd830d, transparent);
+  animation-duration: 1.55s;
+}
+[data-quality="high"] .route-line i {
+  background: linear-gradient(90deg, transparent, #0b9565, transparent);
+  animation-duration: 1s;
+}
+.latency-details {
+  display: grid;
+  grid-template-columns: 0.72fr 1.28fr;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #d9e4f0;
+}
+.latency-details dt {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 5px;
+  color: #52677e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.latency-details dd {
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .speed-test-footer {
   display: block;
-  border-top: 1px solid var(--line);
+  margin-top: 16px;
   padding-top: 12px;
+  border-top: 1px solid var(--line);
   font-size: 12px;
 }
 .speed-test-footer p {
-  max-width: 950px;
+  max-width: 1050px;
 }
 .speed-test-footnote {
-  font-size: 11px;
   margin-top: 4px;
-}
-.speed-edge dt {
-  white-space: nowrap;
+  color: #52677e;
+  font-size: 11px;
 }
 #speedTestProgress {
-  margin-top: 12px;
+  margin-top: 0;
 }
-#speedTestDetail,
-#speedTestFootnote {
+#speedTestDetail {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.5;
+}
+@keyframes routePulse {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(270%); }
+}
+
+.update-pill {
+  border: 1px solid #c9d8ea;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
+  color: var(--ink);
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform var(--ease),
+    border-color var(--ease),
+    box-shadow var(--ease),
+    background var(--ease);
+}
+.update-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px #0b3d6814;
+}
+.update-pill[data-state="available"] {
+  color: #7a2f00;
+  border-color: #f2b66c;
+  background: linear-gradient(135deg, #fff8ed 0%, #ffe3bd 100%);
+}
+.update-pill[data-state="current"] {
+  color: #07593f;
+  border-color: #9fdcc8;
+  background: linear-gradient(135deg, #effcf7 0%, #dff7ed 100%);
+}
+.update-pill[data-state="unavailable"] {
+  color: #8a1f1f;
+  border-color: #f3aaaa;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 100%);
+}
+
+.update-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.update-details div {
+  padding: 12px;
+  border-radius: 12px;
+  background: #f7fbff;
+  border: 1px solid var(--line);
+}
+.update-details dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.update-details dd {
+  margin-top: 5px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.update-change-box {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #fff;
+}
+.update-change-box h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.update-change-box ul {
+  padding-left: 18px;
+  color: var(--text);
 }
 /* Evidence, account administration and technical review. */
 .history-panel {
@@ -2697,40 +2880,15 @@ textarea:disabled {
   .settings-aside {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .speed-test-grid {
-    gap: 16px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
   .speed-test-stage {
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
-  .speed-gauge-ring {
-    width: 130px;
-    height: 130px;
+  .latency-summary {
+    border-top: 1px solid #d9e4f0;
+    border-left: 0;
   }
-  .speed-gauge-ring span {
-    font-size: 32px;
-  }
-  .speed-edge {
-    grid-column: 1/-1;
-    border: 0;
-    padding-left: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .speed-edge dd {
-    margin: 0;
-    font-size: 14px;
-  }
-  .speed-metric {
-    padding-left: 16px;
-  }
-  .speed-metric .metric-value {
-    font-size: 30px;
-  }
-  .speed-metric-primary .metric-value {
-    font-size: 34px;
+  .latency-reading {
+    margin-top: 20px;
   }
   .account-overview,
   .review-center-header,
@@ -2861,13 +3019,28 @@ textarea:disabled {
     align-items: flex-start;
     flex-wrap: wrap;
   }
-  .speed-test-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px 16px;
-  }
   .speed-test-stage,
   .technical-reader-layout {
     grid-template-columns: 1fr;
+  }
+  .throughput-meters {
+    grid-template-columns: 1fr;
+  }
+  .throughput-meter + .throughput-meter {
+    border-top: 1px solid #d9e4f0;
+    border-left: 0;
+  }
+  .throughput-meter,
+  .latency-summary {
+    padding: 18px;
+  }
+  .gauge-canvas {
+    max-width: 380px;
+    margin-inline: auto;
+  }
+  .gauge-scale {
+    width: min(94%, 360px);
+    margin-inline: auto;
   }
   .technical-index {
     display: flex;
@@ -2883,14 +3056,6 @@ textarea:disabled {
   .technical-document {
     max-height: none;
     padding: 20px;
-  }
-  .speed-metric:nth-child(3) {
-    padding-left: 0;
-    border-left: 0;
-  }
-  .speed-test-footer {
-    align-items: flex-start;
-    flex-wrap: wrap;
   }
   .history-toolbar > label,
   .directory-toolbar > label {

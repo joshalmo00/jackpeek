@@ -242,9 +242,9 @@ public sealed class EvidenceStore
         {
             foreach (var path in EnumerateEvidenceFiles(settings.LocalCachePath))
             {
+                retained++;
                 var item = TryReadPending(path, settings, now);
                 if (item is null) continue;
-                retained++;
                 if (item.UploadedToNas)
                 {
                     if (item.WarningDue) expiringSoon++;

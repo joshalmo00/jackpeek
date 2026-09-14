@@ -36,24 +36,25 @@ function fixture(options = {}) {
     }) } };
   };
   const engine = new SpeedTest({ fetch, now: () => now, random: (bytes) => bytes.fill(37),
+    wait: async (ms) => { now += ms; },
     onUpdate: (value) => { updates.push(value); options.update?.(value, engine); } });
-  return { engine, calls, updates };
+  return { engine, calls, updates, getNow: () => now };
 }
 
-test('real transfers produce download, upload, HTTPS ping, jitter, and edge with bounded payloads', async () => {
-  const { engine, calls, updates } = fixture();
+test('real transfers run for 30 seconds and produce download, upload, HTTPS ping, jitter, and edge', async () => {
+  const { engine, calls, updates, getNow } = fixture();
   const result = await engine.run();
   assert.equal(result.phase, 'complete');
   assert.equal(result.running, false);
   assert.equal(result.progress, 100);
+  assert.ok(getNow() >= 30000);
   assert.equal(result.ping, 20);
   assert.equal(result.jitter, 10);
   assert.equal(result.edge, 'EWR');
   assert.ok(result.download > 70 && result.download < 80);
   assert.ok(result.upload > 70 && result.upload < 80);
-  assert.ok(result.payloadBytes <= 39500000);
   assert.ok(calls.every(({url,request}) => Number(url.searchParams.get('bytes')) <= 4000000 && (request.body?.byteLength || 0) <= 4000000));
-  assert.equal(result.samples.length, 12);
+  assert.ok(result.samples.length > 12);
   assert.ok(result.samples.some((sample) => sample.direction === 'download'));
   assert.ok(result.samples.some((sample) => sample.direction === 'upload'));
   assert.ok(updates.every((update, i) => !i || update.progress >= updates[i - 1].progress));

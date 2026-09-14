@@ -222,6 +222,14 @@
         >
         <span class="product-label">Network workspace</span>
         <div class="workstation">
+          <button
+            id="updateStatusBtn"
+            class="update-pill"
+            type="button"
+            hidden
+          >
+            Checking updates
+          </button>
           <span id="sessionMachine">Local workstation</span
           ><span class="version">v1.0</span>
           <button
@@ -288,6 +296,19 @@
         >
       </div>
     </div>
+
+    <button
+      id="speedTestNotice"
+      class="speed-test-notice"
+      type="button"
+      hidden
+    >
+      <span class="notice-spinner" aria-hidden="true"></span>
+      <span>
+        <strong>Speed test running</strong>
+        <small id="speedTestNoticeDetail">Checking connection speed</small>
+      </span>
+    </button>
 
     <main id="main" class="shell main" tabindex="-1">
       <section id="capture" role="tabpanel" aria-labelledby="capture-tab">
@@ -584,90 +605,96 @@
               </button>
             </div>
           </div>
-          <div class="speed-test-stage" aria-label="Live speed test meter">
-            <div class="speed-gauge" aria-hidden="true">
-              <div class="speed-gauge-ring">
-                <span id="speedGaugeValue">–</span>
-                <small id="speedGaugeLabel">Mbps</small>
-              </div>
-            </div>
-            <div class="speed-chart-wrap">
-              <svg
-                id="speedChart"
-                class="speed-chart"
-                viewBox="0 0 360 120"
-                preserveAspectRatio="none"
-                role="img"
-                aria-label="Live speed test graph"
+          <div class="speed-test-stage" aria-label="Live speed test results">
+            <div class="throughput-meters">
+              <article
+                id="downloadGaugeCard"
+                class="throughput-meter"
+                data-quality="idle"
+                aria-labelledby="downloadMeterLabel"
               >
-                <path class="speed-chart-grid" d="M0 30 H360 M0 60 H360 M0 90 H360" />
-                <path id="speedChartPath" class="speed-chart-line" d="" />
-              </svg>
-              <div class="speed-chart-scale">
-                <span>0</span><span id="speedChartPeak">Waiting</span>
+                <div class="meter-heading">
+                  <span id="downloadMeterLabel" class="meter-label">Download</span>
+                  <span id="downloadQuality" class="quality-pill">Waiting</span>
+                </div>
+                <canvas
+                  id="downloadGaugeCanvas"
+                  class="gauge-canvas"
+                  width="640"
+                  height="320"
+                  role="img"
+                  aria-label="Download speed has not been measured"
+                ></canvas>
+                <div class="gauge-scale" aria-hidden="true">
+                  <span>0</span><span>25</span><span>100</span><span>500+</span>
+                </div>
+                <div class="gauge-reading">
+                  <span id="speedDownloadGauge">–</span><small>Mbps</small>
+                </div>
+              </article>
+              <article
+                id="uploadGaugeCard"
+                class="throughput-meter"
+                data-quality="idle"
+                aria-labelledby="uploadMeterLabel"
+              >
+                <div class="meter-heading">
+                  <span id="uploadMeterLabel" class="meter-label">Upload</span>
+                  <span id="uploadQuality" class="quality-pill">Waiting</span>
+                </div>
+                <canvas
+                  id="uploadGaugeCanvas"
+                  class="gauge-canvas"
+                  width="640"
+                  height="320"
+                  role="img"
+                  aria-label="Upload speed has not been measured"
+                ></canvas>
+                <div class="gauge-scale" aria-hidden="true">
+                  <span>0</span><span>10</span><span>50</span><span>200+</span>
+                </div>
+                <div class="gauge-reading">
+                  <span id="speedUploadGauge">–</span><small>Mbps</small>
+                </div>
+              </article>
+            </div>
+            <aside id="pingLinkCard" class="latency-summary" data-quality="idle">
+              <div class="meter-heading">
+                <span class="meter-label">Connection response</span>
+                <span id="pingQuality" class="quality-pill">Waiting</span>
               </div>
-            </div>
+              <div class="latency-reading">
+                <span id="speedPing">–</span><small>ms</small>
+                <span>HTTPS latency</span>
+              </div>
+              <div class="ping-route" aria-hidden="true">
+                <span class="route-node">
+                  <svg class="icon"><use href="/assets/heroicons.svg#computer-desktop" /></svg>
+                </span>
+                <span class="route-line"><i></i></span>
+                <span class="route-node server-node">
+                  <svg class="icon"><use href="/assets/heroicons.svg#server" /></svg>
+                </span>
+              </div>
+              <dl class="latency-details">
+                <div>
+                  <dt>
+                    Jitter<button
+                      class="info-tip"
+                      type="button"
+                      aria-label="About jitter"
+                      title="Average difference between consecutive HTTPS latency measurements. Lower values mean more consistent response times."
+                    >?</button>
+                  </dt>
+                  <dd><span id="speedJitter">–</span> ms</dd>
+                </div>
+                <div>
+                  <dt>Test endpoint</dt>
+                  <dd id="speedEdge">Not connected</dd>
+                </div>
+              </dl>
+            </aside>
           </div>
-          <dl class="speed-test-grid">
-            <div class="speed-metric speed-metric-primary">
-              <dt>
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/heroicons.svg#arrow-down-tray" /></svg
-                >Download
-              </dt>
-              <dd>
-                <span id="speedDownload" class="metric-value">–</span
-                ><span class="speed-unit">Mbps</span>
-              </dd>
-            </div>
-            <div class="speed-metric speed-metric-primary">
-              <dt>
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/heroicons.svg#arrow-up-tray" /></svg
-                >Upload
-              </dt>
-              <dd>
-                <span id="speedUpload" class="metric-value">–</span
-                ><span class="speed-unit">Mbps</span>
-              </dd>
-            </div>
-            <div class="speed-metric">
-              <dt>
-                Ping<button
-                  class="info-tip"
-                  type="button"
-                  aria-label="About ping"
-                  title="Median HTTPS response latency to the Cloudflare edge, not an ICMP ping. Includes browser and server processing."
-                >
-                  ?
-                </button>
-              </dt>
-              <dd>
-                <span id="speedPing" class="metric-value">–</span
-                ><span class="speed-unit">ms</span>
-              </dd>
-            </div>
-            <div class="speed-metric">
-              <dt>
-                Jitter<button
-                  class="info-tip"
-                  type="button"
-                  aria-label="About jitter"
-                  title="Average difference between consecutive HTTPS latency measurements. Lower values mean more consistent response times."
-                >
-                  ?
-                </button>
-              </dt>
-              <dd>
-                <span id="speedJitter" class="metric-value">–</span
-                ><span class="speed-unit">ms</span>
-              </dd>
-            </div>
-            <div class="speed-metric speed-edge">
-              <dt>Cloudflare edge</dt>
-              <dd id="speedEdge">Not connected</dd>
-            </div>
-          </dl>
           <div class="speed-test-footer">
             <progress
               id="speedTestProgress"
@@ -684,9 +711,9 @@
               A speed test starts after sign-in. You can also run one here.
             </p>
             <p class="speed-test-footnote">
-              Active HTTPS test via Cloudflare. Uses your browser's network
-              route, which may differ from the selected Ethernet adapter. Up to
-              40 MB per run; cancel anytime.
+              Active 30-second HTTPS test via Cloudflare. Uses your browser's
+              network route, which may differ from the selected Ethernet
+              adapter. Data use varies by connection; cancel anytime.
             </p>
           </div>
         </section>
@@ -1614,6 +1641,50 @@
         >
       </nav>
     </footer>
+
+    <div
+      id="updateDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="updateDialogTitle"
+      aria-describedby="updateDialogDescription"
+      hidden
+    >
+      <section class="modal-panel update-modal">
+        <div class="modal-heading">
+          <span class="icon-tile info" aria-hidden="true"
+            ><svg class="icon"><use href="/assets/heroicons.svg#arrow-path" /></svg
+          ></span>
+          <div>
+            <span class="badge info">Portable release</span>
+            <h2 id="updateDialogTitle">JackPeek update available</h2>
+            <p id="updateDialogDescription">
+              A newer portable release is available from the NAS repository.
+            </p>
+          </div>
+        </div>
+        <dl class="update-details">
+          <div><dt>Current version</dt><dd id="updateCurrentVersion">v1.0</dd></div>
+          <div><dt>Available version</dt><dd id="updateLatestVersion">Not checked</dd></div>
+          <div><dt>Released</dt><dd id="updateReleaseDate">Not recorded</dd></div>
+          <div><dt>SHA-256</dt><dd id="updateSha">Not published</dd></div>
+        </dl>
+        <div class="update-change-box">
+          <h3>Changes</h3>
+          <ul id="updateChanges"></ul>
+        </div>
+        <p id="updateDialogStatus" class="inline-status" role="status"></p>
+        <div class="modal-actions">
+          <button id="startUpdateBtn" class="button primary" type="button">
+            Start update
+          </button>
+          <button id="postponeUpdateBtn" class="button secondary" type="button">
+            Postpone
+          </button>
+        </div>
+      </section>
+    </div>
 
     <div
       id="npcapDialog"

@@ -47,6 +47,7 @@ builder.Services.AddSingleton<AdminService>();
 builder.Services.AddSingleton<AdminReviewStore>();
 builder.Services.AddSingleton<TechnicalReviewService>();
 builder.Services.AddSingleton<AccessPolicyService>();
+builder.Services.AddSingleton<UpdateService>();
 builder.Services.AddHostedService<EvidenceSyncService>();
 
 var app = builder.Build();
@@ -97,7 +98,7 @@ app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value ?? "";
-    var publicApi = path is "/api/session" or "/api/access/login" or "/api/access/profile" or "/api/access/logout"
+    var publicApi = path is "/api/session" or "/api/update/status" or "/api/update/start" or "/api/access/login" or "/api/access/profile" or "/api/access/logout"
         or "/api/admin/status" or "/api/admin/unlock" or "/api/admin/password";
     if ((path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) && !publicApi) || path.StartsWith("/reports/", StringComparison.OrdinalIgnoreCase))
     {
@@ -118,6 +119,13 @@ app.Use(async (context, next) =>
 app.MapGet("/", () => ServeEmbeddedWebFile("index.html"));
 app.MapGet("/privacy", () => ServeEmbeddedWebFile("privacy.html"));
 app.MapGet("/terms", () => ServeEmbeddedWebFile("terms.html"));
+app.MapGet("/api/update/status", (UpdateService updates) => Results.Ok(updates.GetStatus()));
+app.MapPost("/api/update/start", (UpdateService updates, AuditLog audit) =>
+{
+    var result = updates.StartUpdate();
+    audit.Write("update.start", result.Started ? "success" : "blocked", detail: result.Message);
+    return Results.Ok(result);
+});
 app.MapGet("/{fileName:regex(^[a-zA-Z0-9_.-]+$)}", (string fileName) => ServeEmbeddedWebFile(fileName));
 app.MapGet("/assets/{fileName:regex(^[a-zA-Z0-9_.-]+$)}", (string fileName) => ServeEmbeddedWebFile($"assets/{fileName}"));
 

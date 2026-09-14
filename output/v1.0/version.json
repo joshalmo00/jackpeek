@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "releaseDate": "2026-09-14",
+  "sha256": "6AC55F91EE18FE9C4E458668E0D514992D370ADCEE45FB569422860E2C0F3378",
+  "changes": [
+    "Speed Test now runs for a 30-second measurement window for steadier readings.",
+    "Speed Test starts automatically after sign-in and shows a clickable floating running notice.",
+    "Speed Test now uses calibrated high-resolution gauges where the needle and arc share the same scale.",
+    "Download, upload, ping, jitter, and endpoint results are each shown once in a compact instrument layout.",
+    "Ping is shown as a point-to-point workstation-to-server route.",
+    "NAS health counts all retained local cache evidence files.",
+    "Portable release folder includes SHA256 and NAS publish/update CMD scripts.",
+    "JackPeek checks the NAS release manifest at startup and shows update status."
+  ]
+}
