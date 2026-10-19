@@ -2,17 +2,11 @@
   "version": 1,
   "dependencies": {
     "net8.0": {
-      "Microsoft.NET.ILLink.Tasks": {
-        "type": "Direct",
-        "requested": "[8.0.30, )",
-        "resolved": "8.0.30",
-        "contentHash": "SfmwuZjUPBTEoBMAsXZ/hWkaEK9oL+Y/UtAx7N6RyWHfcMt9J0ExrNPuOgTyPbCXIyiTBFsxFNrPLEZNPmJcvA=="
-      },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Direct",
-        "requested": "[8.0.0, )",
-        "resolved": "8.0.0",
-        "contentHash": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg=="
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "aUSmC6cPjFLSE0rDTsmkR3wvUOnscqewebOaaELEToh12sNmoltZqT3f0C81mJ1zhxKjWco25soHTvYwsXCsUw=="
       },
       "PacketDotNet": {
         "type": "Transitive",
@@ -69,13 +63,6 @@
         "dependencies": {
           "NetworkPortAnalyzer.Core": "[1.0.0, )"
         }
-      }
-    },
-    "net8.0/win-x64": {
-      "System.Text.Encoding.CodePages": {
-        "type": "Transitive",
-        "resolved": "9.0.5",
-        "contentHash": "P6gqCJcVjdWA50Eai95eYdG4ryrb1xCd770NhQrvj847C7m30CJwQqzKykWoEMvV4qvjUazL/m7UMQdMZTp5xw=="
       }
     }
   }
